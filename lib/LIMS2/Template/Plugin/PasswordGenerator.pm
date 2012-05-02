@@ -15,7 +15,7 @@ sub generate_password {
 
     my $pw_chars = $class->PW_CHARS;
 
-    join '', map { $pw_chars->[ int rand @{$pw_chars} ] } 1 .. $pw_len;
+    return join '', map { $pw_chars->[ int rand @{$pw_chars} ] } 1 .. $pw_len;
 }
 
 1;

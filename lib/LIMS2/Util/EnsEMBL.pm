@@ -36,32 +36,32 @@ has species => (
 
 sub db_adaptor {
     my ( $self, $species ) = @_;
-    $self->registry->get_DBAdaptor( $species || $self->species, 'core' );
+    return $self->registry->get_DBAdaptor( $species || $self->species, 'core' );
 }
 
 sub gene_adaptor {
     my ( $self, $species ) = @_;
-    $self->registry->get_adaptor( $species || $self->species, 'core', 'gene' );
+    return $self->registry->get_adaptor( $species || $self->species, 'core', 'gene' );
 }
 
 sub slice_adaptor {
     my ( $self, $species ) = @_;
-    $self->registry->get_adaptor( $species || $self->species, 'core', 'slice' );
+    return $self->registry->get_adaptor( $species || $self->species, 'core', 'slice' );
 }
 
 sub transcript_adaptor {
     my ( $self, $species ) = @_;
-    $self->registry->get_adaptor( $species || $self->species, 'core', 'transcript' );
+    return $self->registry->get_adaptor( $species || $self->species, 'core', 'transcript' );
 }
 
 sub constrained_element_adaptor {
     my ($self) = @_;
-    $self->registry->get_adaptor( 'Multi', 'compara', 'ConstrainedElement' );
+    return $self->registry->get_adaptor( 'Multi', 'compara', 'ConstrainedElement' );
 }
 
 sub repeat_feature_adaptor {
     my ( $self, $species ) = @_;
-    $self->registry->get_adaptor( $species || $self->species, 'core', 'repeatfeature' );
+    return $self->registry->get_adaptor( $species || $self->species, 'core', 'repeatfeature' );
 }
 
 __PACKAGE__->meta->make_immutable;

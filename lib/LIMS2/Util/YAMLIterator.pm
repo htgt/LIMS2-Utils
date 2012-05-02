@@ -16,8 +16,6 @@ use YAML::Any qw( Load );
 use Iterator::Simple qw( iterator );
 use Const::Fast;
 
-use Smart::Comments;
-
 const my $COMMENT_RX   => qr/^#/;
 const my $DOC_START_RX => qr/^---/;
 
@@ -52,19 +50,21 @@ sub _read {
     if ( blessed($input) and $input->can('getline') ) {
         return $input;
     }
-    elsif ( ref $input eq 'GLOB' and *$input{"IO"} ) {
+
+    if ( ref $input eq 'GLOB' and *$input{"IO"} ) {
         return *$input{"IO"};
     }
-    elsif ( ref $input eq 'SCALAR' ) {
+
+    if ( ref $input eq 'SCALAR' ) {
         return IO::String->new( ${$input} );
     }
-    elsif ( !ref $input ) {
+
+    if ( !ref $input ) {
         return IO::File->new( $input, O_RDONLY )
-            || die "open $input: $!";
+            || confess "open $input: $!";
     }
-    else {
-        confess ref($input) . ' not supported';
-    }
+
+    confess ref($input) . ' not supported';
 }
 
 1;

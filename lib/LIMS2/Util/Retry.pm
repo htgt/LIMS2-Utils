@@ -24,6 +24,7 @@ sub exponential {
     };
 }
 
+## no critic(ProhibitSubroutinePrototypes)
 sub retry (&@) {
     my ( $thunk, %opts ) = @_;
 
@@ -52,6 +53,7 @@ sub retry (&@) {
 
     die $err;
 }
+## use critic
 
 1;
 
