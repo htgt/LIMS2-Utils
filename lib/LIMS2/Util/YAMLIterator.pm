@@ -4,10 +4,8 @@ use strict;
 use warnings FATAL => 'all';
 
 use Sub::Exporter -setup => {
-    exports => [ 'iyaml' ],
-    groups => {
-        default => [ 'iyaml' ]
-    }
+    exports => ['iyaml'],
+    groups  => { default => ['iyaml'] }
 };
 
 use Carp qw( confess );
@@ -26,7 +24,7 @@ const my $DOC_START_RX => qr/^---/;
 sub iyaml {
     my $input = shift;
 
-    my $ifh = _read( $input );
+    my $ifh = _read($input);
 
     my $line = $ifh->getline;
 
@@ -41,7 +39,7 @@ sub iyaml {
             last if $line =~ $DOC_START_RX;
             $document .= $line;
         }
-        if ( $document ) {
+        if ($document) {
             return Load($document);
         }
         return;
@@ -51,16 +49,16 @@ sub iyaml {
 sub _read {
     my $input = shift;
 
-    if ( blessed( $input ) and $input->can( 'getline' ) ) {
+    if ( blessed($input) and $input->can('getline') ) {
         return $input;
     }
     elsif ( ref $input eq 'GLOB' and *$input{"IO"} ) {
         return *$input{"IO"};
-    }    
-    elsif ( ref $input eq 'SCALAR' ) {
-        return IO::String->new( ${ $input } );
     }
-    elsif ( ! ref $input ) {
+    elsif ( ref $input eq 'SCALAR' ) {
+        return IO::String->new( ${$input} );
+    }
+    elsif ( !ref $input ) {
         return IO::File->new( $input, O_RDONLY )
             || die "open $input: $!";
     }

@@ -35,7 +35,7 @@ has species => (
 );
 
 sub db_adaptor {
-    my ( $self, $species ) = @_;    
+    my ( $self, $species ) = @_;
     $self->registry->get_DBAdaptor( $species || $self->species, 'core' );
 }
 
@@ -55,7 +55,7 @@ sub transcript_adaptor {
 }
 
 sub constrained_element_adaptor {
-    my ( $self ) = @_;
+    my ($self) = @_;
     $self->registry->get_adaptor( 'Multi', 'compara', 'ConstrainedElement' );
 }
 

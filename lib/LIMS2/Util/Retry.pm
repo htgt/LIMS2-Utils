@@ -3,16 +3,14 @@ package LIMS2::Util::Retry;
 use strict;
 use warnings FATAL => 'all';
 
-use Sub::Exporter -setup => {
-    exports => [ qw( retry constantly exponential ) ]
-};
+use Sub::Exporter -setup => { exports => [qw( retry constantly exponential )] };
 
 use Try::Tiny;
 
 sub constantly {
-    my ( $delay ) = @_;
+    my ($delay) = @_;
     $delay ||= 1;
-    return sub { $delay };
+    return sub {$delay};
 }
 
 sub exponential {
@@ -23,7 +21,7 @@ sub exponential {
         my $this_delay = $delay;
         $delay *= $backoff;
         return $this_delay;
-    };    
+    };
 }
 
 sub retry (&@) {
@@ -34,11 +32,11 @@ sub retry (&@) {
 
     my $err;
 
-    while ( 1 ) {        
+    while (1) {
         undef $err;
-        if ( wantarray ) {
+        if (wantarray) {
             my @res = try { $thunk->() } catch { $err = $_ };
-            return @res unless defined $err;            
+            return @res unless defined $err;
         }
         elsif ( not defined wantarray ) {
             try { $thunk->() } catch { $err = $_ };
@@ -52,7 +50,7 @@ sub retry (&@) {
         sleep $backoff->();
     }
 
-    die $err;    
+    die $err;
 }
 
 1;
