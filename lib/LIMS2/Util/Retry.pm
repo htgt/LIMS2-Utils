@@ -1,4 +1,10 @@
 package LIMS2::Util::Retry;
+## no critic(RequireUseStrict,RequireUseWarnings)
+{
+    $LIMS2::Util::Retry::VERSION = '0.001';
+}
+## use critic
+
 
 use strict;
 use warnings FATAL => 'all';
