@@ -1,5 +1,7 @@
 {{$NEXT}}
 
+0.002     2012-05-30 16:41:50 Europe/London
+
         Implement Solr search client.
 
 0.001     2012-05-02 15:01:24 Europe/London
