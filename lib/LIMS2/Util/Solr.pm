@@ -4,9 +4,9 @@ use strict;
 use warnings FATAL => 'all';
 
 use Moose;
-use MooseX::Types::URI;
+use MooseX::Types::URI qw( Uri );
 use LWP::UserAgent;
-use Hash::Utils qw( slice );
+use Hash::MoreUtils qw( slice );
 use URI;
 use JSON;
 use LIMS2::Exception;
@@ -38,7 +38,7 @@ has ua => (
     handles    => [ 'get' ]
 );
 
-sub build_ua {
+sub _build_ua {
     return LWP::UserAgent->new();
 }
 
@@ -47,7 +47,7 @@ sub query {
 
     $attrs ||= $self->default_attrs;
 
-    my $uri = $self->uri->clone;
+    my $uri = $self->solr_uri->clone;
 
     my $start = 0;
 
@@ -55,14 +55,14 @@ sub query {
 
     while( 1 ) {
         $uri->query_form( q => $search_str, wt => 'json', rows => $self->solr_rows, start => $start );
-        my $response = $ua->get($uri);
+        my $response = $self->get($uri);
         unless ( $response->is_success ) {
             LIMS2::Exception->throw( "Solr search for '$search_str' failed: " . $response->message );
         }
         my $result = decode_json( $response->content );
         my $num_found = $result->{response}{numFound};
         push @results, map { +{ slice $_, @{$attrs} } } @{ $result->{response}{docs} };
-        $start += $self->rows;
+        $start += $self->solr_rows;
         last if $start >= $num_found;
     }
 
