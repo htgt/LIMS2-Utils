@@ -69,7 +69,7 @@ sub query {
         my $num_found = $result->{response}{numFound};
         if ( $num_found > $self->solr_max_rows ) {
             LIMS2::Execpiton->throw( "Too many results ($num_found) returned for '$search_str'" );
-        }        
+        }
         push @results, map { +{ slice $_, @{$attrs} } } @{ $result->{response}{docs} };
         $start += $self->solr_rows;
         last if $start >= $num_found;
