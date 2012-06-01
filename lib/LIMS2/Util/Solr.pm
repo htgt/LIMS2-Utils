@@ -1,7 +1,7 @@
 package LIMS2::Util::Solr;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::Solr::VERSION = '0.002';
+    $LIMS2::Util::Solr::VERSION = '0.003';
 }
 ## use critic
 
@@ -37,6 +37,12 @@ has solr_rows => (
     default => 10
 );
 
+has solr_max_rows => (
+    is      => 'ro',
+    isa     => 'Int',
+    default => 500
+);
+
 has ua => (
     is         => 'ro',
     isa        => 'LWP::UserAgent',
@@ -67,6 +73,9 @@ sub query {
         }
         my $result = decode_json( $response->content );
         my $num_found = $result->{response}{numFound};
+        if ( $num_found > $self->solr_max_rows ) {
+            LIMS2::Execpiton->throw( "Too many results ($num_found) returned for '$search_str'" );
+        }
         push @results, map { +{ slice $_, @{$attrs} } } @{ $result->{response}{docs} };
         $start += $self->solr_rows;
         last if $start >= $num_found;

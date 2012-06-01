@@ -1,3 +1,7 @@
+0.003     2012-06-01 08:40:27 Europe/London
+
+        Limit the maximum number of rows retrieved from the Solr index.
+
 0.002     2012-05-30 16:41:50 Europe/London
 
         Implement Solr search client.
