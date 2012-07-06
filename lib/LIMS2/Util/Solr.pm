@@ -55,32 +55,43 @@ sub query {
 
     my $uri = $self->solr_uri->clone;
     
-    my $start = defined($page) ? ( $page - 1 ) * $self->solr_rows
-              :                  0;
-
     my $search_str = $self->build_search_str( $search_term );    
     
     my @results;
 
-    while( 1 ) {
-        $uri->query_form( q => $search_str, wt => 'json', rows => $self->solr_rows, start => $start );
-        my $response = $self->get($uri);
-        unless ( $response->is_success ) {
-            LIMS2::Exception->throw( "Solr search for '$search_str' failed: " . $response->message );
-        }
-        my $result = decode_json( $response->content );
-        my $num_found = $result->{response}{numFound};
-        if ( $num_found > $self->solr_max_rows ) {
-            LIMS2::Execpiton->throw( "Too many results ($num_found) returned for '$search_str'" );
-        }
+    if ( defined $page ) {
+        my $start = ( $page - 1 ) * $self->solr_rows;
+        my $result = $self->do_solr_query( $uri, $search_str, $start );
         push @results, map { +{ slice $_, @{$attrs} } } @{ $result->{response}{docs} };
-        last if defined $page; # we are retrieving only one page        
-        $start += $self->solr_rows;
-        last if $start >= $num_found;
+    }
+    else {
+        my $start = 0;          
+        while( 1 ) {
+            my $result = $self->do_solr_query( $uri, $search_str, $start );            
+            my $num_found = $result->{response}{numFound};
+            if ( $num_found > $self->solr_max_rows ) {
+                LIMS2::Execpiton->throw( "Too many results ($num_found) returned for '$search_str'" );
+            }
+            push @results, map { +{ slice $_, @{$attrs} } } @{ $result->{response}{docs} };
+            $start += $self->solr_rows;
+            last if $start >= $num_found;
+        }
     }
 
     return \@results;
 }
+
+sub do_solr_query {
+    my ( $self, $uri, $search_str, $start ) = @_;
+
+    $uri->query_form( q => $search_str, wt => 'json', rows => $self->solr_rows, start => $start );
+    my $response = $self->get($uri);
+    unless ( $response->is_success ) {
+        LIMS2::Exception->throw( "Solr search for '$search_str' failed: " . $response->message );
+    }
+
+    return decode_json( $response->content );
+}    
 
 sub build_search_str {
     my ( $self, $search_term ) = @_;

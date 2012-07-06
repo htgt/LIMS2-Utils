@@ -28,6 +28,11 @@ lives_ok {
     is @{$res}, 1, 'returns 1 result';
 };
 
+lives_ok {
+    ok my $res = $s->query( 'hox', undef, 1 ), 'Query hox - page 1';
+    ok @{$res} > 1, 'returns many results';
+};
+
 done_testing;
 
 
