@@ -54,9 +54,9 @@ sub query {
     $attrs ||= $self->default_attrs;
 
     my $uri = $self->solr_uri->clone;
-    
-    my $search_str = $self->build_search_str( $search_term );    
-    
+
+    my $search_str = $self->build_search_str( $search_term );
+
     my @results;
 
     if ( defined $page ) {
@@ -65,9 +65,9 @@ sub query {
         push @results, map { +{ slice $_, @{$attrs} } } @{ $result->{response}{docs} };
     }
     else {
-        my $start = 0;          
+        my $start = 0;
         while( 1 ) {
-            my $result = $self->do_solr_query( $uri, $search_str, $start );            
+            my $result = $self->do_solr_query( $uri, $search_str, $start );
             my $num_found = $result->{response}{numFound};
             if ( $num_found > $self->solr_max_rows ) {
                 LIMS2::Execpiton->throw( "Too many results ($num_found) returned for '$search_str'" );
@@ -91,20 +91,20 @@ sub do_solr_query {
     }
 
     return decode_json( $response->content );
-}    
+}
 
 sub build_search_str {
     my ( $self, $search_term ) = @_;
 
     my $reftype = ref $search_term;
-    
+
     if ( $reftype ) {
         if ( $reftype eq ref [] ) {
             return sprintf( '%s:%s', $search_term->[0], $self->quote_str( $search_term->[1] ) );
         }
         LIMS2::Exception->throw( "Cannot build search string from $reftype" );
     }
-    
+
     return $self->quote_str($search_term);
 }
 
@@ -114,7 +114,7 @@ sub quote_str {
     $str =~ s/"/\"/g;
 
     return sprintf '"%s"', $str;
-}    
+}
 
 __PACKAGE__->meta->make_immutable;
 
