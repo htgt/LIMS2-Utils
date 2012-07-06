@@ -49,14 +49,17 @@ sub _build_ua {
 }
 
 sub query {
-    my ( $self, $search_str, $attrs ) = @_;
+    my ( $self, $search_term, $attrs, $page ) = @_;
 
     $attrs ||= $self->default_attrs;
 
     my $uri = $self->solr_uri->clone;
+    
+    my $start = defined($page) ? ( $page - 1 ) * $self->solr_rows
+              :                  0;
 
-    my $start = 0;
-
+    my $search_str = $self->build_search_str( $search_term );    
+    
     my @results;
 
     while( 1 ) {
@@ -71,12 +74,36 @@ sub query {
             LIMS2::Execpiton->throw( "Too many results ($num_found) returned for '$search_str'" );
         }
         push @results, map { +{ slice $_, @{$attrs} } } @{ $result->{response}{docs} };
+        last if defined $page; # we are retrieving only one page        
         $start += $self->solr_rows;
         last if $start >= $num_found;
     }
 
     return \@results;
 }
+
+sub build_search_str {
+    my ( $self, $search_term ) = @_;
+
+    my $reftype = ref $search_term;
+    
+    if ( $reftype ) {
+        if ( $reftype eq ref [] ) {
+            return sprintf( '%s:%s', $search_term->[0], $self->quote_str( $search_term->[1] ) );
+        }
+        LIMS2::Exception->throw( "Cannot build search string from $reftype" );
+    }
+    
+    return $self->quote_str($search_term);
+}
+
+sub quote_str {
+    my ( $self, $str ) = @_;
+
+    $str =~ s/"/\"/g;
+
+    return sprintf '"%s"', $str;
+}    
 
 __PACKAGE__->meta->make_immutable;
 

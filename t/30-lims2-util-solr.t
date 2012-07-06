@@ -18,6 +18,16 @@ lives_ok {
     ok @{$res} > 1, 'returns many results';
 };
 
+lives_ok {
+    ok my $res = $s->query( [ marker_symbol => 'Cbx1' ] ), 'Query Cbx1 by marker symbol';
+    is @{$res}, 1, 'returns 1 result';
+};
+
+lives_ok {
+    ok my $res = $s->query( [ mgi_accession_id => 'MGI:105369' ] ), 'Query MGI:105369';
+    is @{$res}, 1, 'returns 1 result';
+};
+
 done_testing;
 
 
