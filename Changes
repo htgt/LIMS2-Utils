@@ -1,5 +1,10 @@
 {{$NEXT}}
 
+0.004     2012-07-06 11:19:21 Europe/London
+
+        Add paging support.
+        Add support for search on specific attribute.
+
 0.003     2012-06-01 08:40:27 Europe/London
 
         Limit the maximum number of rows retrieved from the Solr index.
