@@ -1,7 +1,7 @@
 package LIMS2::Util::Solr;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::Solr::VERSION = '0.004';
+    $LIMS2::Util::Solr::VERSION = '0.005';
 }
 ## use critic
 
@@ -76,7 +76,7 @@ sub query {
             my $result = $self->do_solr_query( $uri, $search_str, $start );
             my $num_found = $result->{response}{numFound};
             if ( $num_found > $self->solr_max_rows ) {
-                LIMS2::Execpiton->throw( "Too many results ($num_found) returned for '$search_str'" );
+                LIMS2::Exception->throw( "Too many results ($num_found) returned for '$search_str'" );
             }
             push @results, map { +{ slice $_, @{$attrs} } } @{ $result->{response}{docs} };
             $start += $self->solr_rows;

@@ -1,3 +1,7 @@
+0.005     2012-07-09 09:48:50 Europe/London
+
+        Bugfix typo in name of exception class.
+
 0.004     2012-07-06 11:19:21 Europe/London
 
         Add paging support.
