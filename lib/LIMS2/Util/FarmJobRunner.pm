@@ -14,17 +14,17 @@ use File::Which qw( which );
 use IPC::Run;
 
 #both of these can be overriden per job.
-has default_queue => ( 
+has default_queue => (
     is      => 'rw',
-    isa     => 'Str', 
-    default => 'normal', 
-); 
+    isa     => 'Str',
+    default => 'normal',
+);
 
 has default_memory => (
     is      => 'rw',
     isa     => 'Num',
     default => 2000,
-); 
+);
 
 #this is the file that sets the appropriate environment for running farm jobs.
 has bsub_wrapper => (
@@ -46,7 +46,7 @@ subtype 'ArrayRefOfInts',
     as 'ArrayRef[Int]';
 
 coerce 'ArrayRefOfInts',
-    from 'Int', 
+    from 'Int',
     via { [ $_ ] };
 
 sub submit_pspec {
@@ -106,7 +106,7 @@ sub _wrap_bsub {
     my ( $self, @bsub ) = @_;
 
     #which returns undef if it cant find the file
-    which( $self->bsub_wrapper ) 
+    which( $self->bsub_wrapper )
         or confess "Couldn't locate " . $self->bsub_wrapper;
 
     return (
@@ -119,11 +119,11 @@ sub _build_job_dependency {
     my ( $self, $dependencies ) = @_;
 
     #make sure we got an array
-    confess "_build_job_dependency expects an ArrayRef" 
+    confess "_build_job_dependency expects an ArrayRef"
         unless ref $dependencies eq 'ARRAY';
 
     #return an empty list so nothing gets added to the bsub if we dont have any
-    return () unless @{ $dependencies }; 
+    return () unless @{ $dependencies };
 
     #this creates a list of dependencies, for example 'done(12) && done(13) && done(14)'
     return ( '-w', join( " && ", map { 'done(' . $_ . ')' } @{ $dependencies } ) );
@@ -134,7 +134,7 @@ sub _run_cmd {
 
     my $output;
 
-    try {    
+    try {
         IPC::Run::run( \@cmd, '<', \undef, '>&', \$output )
                 or die "$output";
     }
