@@ -1,0 +1,51 @@
+---
+abstract: 'Utilities for LIMS2'
+author:
+  - 'Ray Miller <rm7@sanger.ac.uk>'
+build_requires:
+  English: 0
+  File::Find: 0
+  File::Temp: 0
+  Test::More: 0.88
+  Test::Most: 0
+configure_requires:
+  ExtUtils::MakeMaker: 6.30
+dynamic_config: 0
+generated_by: 'Dist::Zilla version 4.300014, CPAN::Meta::Converter version 2.120921'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: LIMS2-Util
+requires:
+  Bio::EnsEMBL::Registry: 0
+  Carp: 0
+  Class::Data::Inheritable: 0
+  Const::Fast: 0
+  File::Which: 0
+  Hash::MoreUtils: 0
+  IO::File: 0
+  IO::String: 0
+  IPC::Run: 0
+  Iterator::Simple: 0
+  JSON: 0
+  LIMS2::Exception: 0
+  LWP::UserAgent: 0
+  Moose: 0
+  Moose::Util::TypeConstraints: 0
+  MooseX::ClassAttribute: 0
+  MooseX::Params::Validate: 0
+  MooseX::Types::Path::Class::MoreCoercions: 0
+  MooseX::Types::URI: 0
+  Path::Class: 0
+  Scalar::Util: 0
+  Sub::Exporter: 0
+  Template::Plugin: 0
+  Try::Tiny: 0
+  URI: 0
+  YAML::Any: 0
+  base: 0
+  namespace::autoclean: 0
+  strict: 0
+  warnings: 0
+version: 0.006
