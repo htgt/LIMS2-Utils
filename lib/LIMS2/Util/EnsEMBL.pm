@@ -64,6 +64,11 @@ sub repeat_feature_adaptor {
     return $self->registry->get_adaptor( $species || $self->species, 'core', 'repeatfeature' );
 }
 
+sub exon_adaptor {
+    my ( $self, $species ) = @_;
+    return $self->registry->get_adaptor( $species || $self->species, 'core', 'exon' );
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
