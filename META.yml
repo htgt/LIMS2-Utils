@@ -22,16 +22,22 @@ requires:
   Carp: 0
   Class::Data::Inheritable: 0
   Const::Fast: 0
+  File::Which: 0
   Hash::MoreUtils: 0
   IO::File: 0
   IO::String: 0
+  IPC::Run: 0
   Iterator::Simple: 0
   JSON: 0
   LIMS2::Exception: 0
   LWP::UserAgent: 0
   Moose: 0
+  Moose::Util::TypeConstraints: 0
   MooseX::ClassAttribute: 0
+  MooseX::Params::Validate: 0
+  MooseX::Types::Path::Class::MoreCoercions: 0
   MooseX::Types::URI: 0
+  Path::Class: 0
   Scalar::Util: 0
   Sub::Exporter: 0
   Template::Plugin: 0
@@ -42,4 +48,4 @@ requires:
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.005
+version: 0.007

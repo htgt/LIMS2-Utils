@@ -1,7 +1,7 @@
 package LIMS2::Util::EnsEMBL;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::EnsEMBL::VERSION = '0.005';
+    $LIMS2::Util::EnsEMBL::VERSION = '0.007';
 }
 ## use critic
 
@@ -68,6 +68,11 @@ sub constrained_element_adaptor {
 sub repeat_feature_adaptor {
     my ( $self, $species ) = @_;
     return $self->registry->get_adaptor( $species || $self->species, 'core', 'repeatfeature' );
+}
+
+sub exon_adaptor {
+    my ( $self, $species ) = @_;
+    return $self->registry->get_adaptor( $species || $self->species, 'core', 'exon' );
 }
 
 __PACKAGE__->meta->make_immutable;

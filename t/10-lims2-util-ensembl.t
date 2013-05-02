@@ -14,4 +14,6 @@ can_ok $u, 'gene_adaptor';
 
 isa_ok $u->gene_adaptor, 'Bio::EnsEMBL::DBSQL::GeneAdaptor';
 
+isa_ok $u->exon_adaptor, 'Bio::EnsEMBL::DBSQL::ExonAdaptor';
+
 done_testing;
