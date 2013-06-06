@@ -68,7 +68,7 @@ sub exon_adaptor {
     my ( $self, $species ) = @_;
     return $self->registry->get_adaptor( $species || $self->species, 'core', 'exon' );
 }
-    
+
 sub get_best_transcript {
     my ( $self, $ensembl_object ) = @_;
 
@@ -99,7 +99,7 @@ sub get_best_transcript {
         }
     }
 
-    confess "Couldn't find a valid transcript." 
+    confess "Couldn't find a valid transcript."
         unless $best_transcript;
 
     return $best_transcript;

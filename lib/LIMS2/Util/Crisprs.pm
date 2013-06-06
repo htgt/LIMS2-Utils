@@ -223,7 +223,7 @@ sub _build_files {
 #use LIMS2::Util::Crisprs;
 #my $crispr_util = LIMS2::Util::Crisprs->new( species => "mouse" );
 #$crispr_util->find_crisprs( 103 ); #or find_crisprs( [103, 104, 105] )
-#or find_crisprs( "ENSMUSE00001107660" ) 
+#or find_crisprs( "ENSMUSE00001107660" )
 #$crispr_util->run_exonerate();
 #$crispr_util->process_exonerate();
 #
@@ -477,7 +477,7 @@ sub run_exonerate {
     my ( $self ) = @_;
 
     #make sure the previous step has been run at some point
-    confess "Fasta file " . $self->get_filename( 'fasta' ) . " not found!" 
+    confess "Fasta file " . $self->get_filename( 'fasta' ) . " not found!"
         unless -e $self->get_filename( 'fasta' );
 
     #change showalignment to yes to see more detailed output.
@@ -510,7 +510,7 @@ sub process_exonerate {
 
     $self->log->info( "Processing exonerate output" );
 
-    confess "Exon data not loaded; you must populate the exons hash first." 
+    confess "Exon data not loaded; you must populate the exons hash first."
         unless $self->exons_loaded;
 
     #this is the output file from exonerate
@@ -655,7 +655,7 @@ sub create_db_yaml {
 
     $self->log->info( "Creating DB YAML" );
 
-    confess "Exon data not loaded; you must populate the exons hash first." 
+    confess "Exon data not loaded; you must populate the exons hash first."
         unless $self->exons_loaded;
 
     my @crisprs;
@@ -732,7 +732,7 @@ sub create_csv {
 
     $self->log->info( "Creating CSV" );
 
-    confess "Exon data not loaded; you must populate the exons hash first." 
+    confess "Exon data not loaded; you must populate the exons hash first."
         unless $self->exons_loaded;
 
     my @rows;
@@ -806,7 +806,7 @@ sub create_csv {
 
         if ( %rows_to_add ) {
             #sort the keys by num exons then introns then other, and add all the associated rows.
-            push @rows, join( "\n", @{ $rows_to_add{$_} } ) 
+            push @rows, join( "\n", @{ $rows_to_add{$_} } )
                 for sort { (split(":", $a))[0] <=> (split(":", $b))[0] ||
                            (split(":", $a))[1] <=> (split(":", $b))[1] ||
                            (split(":", $a))[2] <=> (split(":", $b))[2] } keys %rows_to_add;
