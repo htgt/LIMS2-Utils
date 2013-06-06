@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.008     2013-06-06 09:45:59 Europe/London
+
+    Added Crisprs module and some new functionality to EnsEMBL module. 
+
 0.007     2013-05-02 07:35:10 Europe/London
 
     Added exon_adaptor to EnsEMBL utils module.
