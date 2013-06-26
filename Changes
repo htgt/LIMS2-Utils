@@ -1,5 +1,7 @@
 {{$NEXT}}
 
+    Relaxed crispr finding criteria.
+
 0.008     2013-06-06 09:45:59 Europe/London
 
     Added Crisprs module and some new functionality to EnsEMBL module. 
