@@ -1,7 +1,7 @@
 package LIMS2::Util::Crisprs;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::Crisprs::VERSION = '0.008';
+    $LIMS2::Util::Crisprs::VERSION = '0.009';
 }
 ## use critic
 
@@ -79,12 +79,18 @@ has species => (
 );
 
 #the number of bp at the end of a site to remove to get the seed
-#that is, $CRISPR_LENGTH - $self->non_seed_length = SEED_LENGTH
+#that is, $self->crispr_length - $self->non_seed_length = SEED_LENGTH
 has non_seed_length => (
     is       => 'rw',
     isa      => 'Int',
-    default  => 8,
+    default  => 7,
     required => 1
+);
+
+has crispr_length => (
+    is       => 'rw',
+    isa      => 'Int',
+    default => 22
 );
 
 has exonerate_min_score => (
@@ -143,7 +149,7 @@ sub _build_exonerate_min_score {
     my $self = shift;
 
     #this is the length of the seed multiplied by the exonerate match score
-    return (23 - $self->non_seed_length) * 5;
+    return ($self->crispr_length - $self->non_seed_length) * 5;
 }
 
 sub _build_ensembl {
@@ -203,27 +209,6 @@ sub _build_files {
     # all N matches on human. they aren't valid. to do with the without_Ns .fa
     #
 #
-
-# #get all the designs and any crispr sites within their floxed exons
-# my $data = find_crisprs_for_designs( get_designs(), $all_data_file );
-# #my $data = get_single_exon_data( "ENSMUSG00000025630", $all_data_file );
-# #create a fasta file containing the seeds for every crispr site we found
-# write_seeds( \%seeds, $fasta_out_file );
-
-# #align all the seeds against the whole mouse genome
-# run_exonerate( $fasta_out_file, $exonerate_output_file );
-
-# #extract all the information from the exonerate output
-# my $off_targets = process_exonerate( $exonerate_output_file, $off_targets_file  );
-
-# #now merge the off_targets into $data.
-# #my $data = YAML::Any::LoadFile( $final_output );
-# #my $off_targets = YAML::Any::LoadFile( $off_targets_file );
-# merge_output( $off_targets, $data, $final_output );
-
-# #create_db_yaml( $data, $db_output );
-
-# create_csv( $final_output, $csv_output );
 
 #example usage:
 #use LIMS2::Util::Crisprs;
@@ -345,16 +330,23 @@ sub _add_exon_data {
 
     #add all the matches for both strands
     my $seq = $exon->seq->seq; #have to do this or it loops infinitely
-    while ( $seq =~ /(G[CTGA]{19}[CTGA]GG)/g ) {
+    while ( $seq =~ /([CTGA]{19}[CTGA]GG)/g ) {
         #$-[0] is match start, $+[0] is match_end
         push @{ $matches->{$strand} } => $self->_create_match_hashref( $1, $exon, $-[0], $+[0] );
         $total_matches++;
+
+        #a hack to move the next search position backwards to just after the GG/CC
+        #to make sure we get any overlapping crisprs
+        pos($seq) -= ($self->crispr_length - 2);
     }
 
-    while ( $seq =~ /(CC[CTGA][CTGA]{19}C)/g ) {
+    while ( $seq =~ /(CC[CTGA][CTGA]{19})/g ) {
         push @{ $matches->{$comp_strand} },
             $self->_create_match_hashref( revcom( $1 )->seq, $exon, $-[0], $+[0] );
         $total_matches++;
+
+        #same as above
+        pos($seq) -= ($self->crispr_length - 2);
     }
 
     #add all the data we just collected to our hash.
@@ -378,11 +370,6 @@ sub _add_exon_data {
 #get all the information we want for a given site.
 sub _create_match_hashref {
     my ( $self, $crispr_site, $exon, $match_start, $match_end ) = @_;
-
-    #revcom all CC-C matches just in case the user forgot to
-    if ( substr( $crispr_site, 0, 1 ) eq "C" ) {
-        $crispr_site = revcom( $crispr_site )->seq;
-    }
 
     my %match = (
         crispr_site => $crispr_site,
@@ -681,17 +668,18 @@ sub create_db_yaml {
                               ($total_intron_off_targets + $total_other_off_targets) > $self->outlier_limit;
 
                 my %crispr_site = (
-                    seq => $match->{ crispr_site },
-                    type => "Exonic",
-                    off_target_outlier => $outlier,
+                    seq                  => $match->{ crispr_site },
+                    off_target_algorithm => "strict",
+                    type                 => "Exonic",
+                    off_target_outlier   => $outlier,
+                    off_target_summary   => "{Exons: $total_exon_off_targets, "
+                                          . "Introns: $total_intron_off_targets, "
+                                          . "Intergenic: $total_other_off_targets}", #stored as json
                     locus => {
                         chr_name   => $exon->{ chromosome },
                         chr_start  => $match->{ start },
                         chr_end    => $match->{ end },
                         chr_strand => $self->strands->{ $strand }->{ name }, #get strand as number
-                        comment    => "{Exons: $total_exon_off_targets, "
-                                    . "Introns: $total_intron_off_targets, "
-                                    . "Intergenic: $total_other_off_targets}" #stored as json
                     }
                 );
 
@@ -784,8 +772,12 @@ sub create_csv {
             my $symbol = $self->strands->{ $strand }{ symbol };
 
             for my $match ( @{ $exon->{ matches }{ $strand } } ) {
-                #the oligo sequence doesnt include the pam site or G at the start
-                my $site = substr($match->{ crispr_site }, 1, 19);
+                #the oligo sequence doesnt include the pam site.
+                my $site = substr($match->{ crispr_site }, 0, -3);
+                #NOTE:
+                #the oligos might not be correct. I don't know if we need to add a G 
+                #to the oligo append sequence or not i need to get stuff farmed and 
+                #this function isn't used currently so i'm leaving it like this. sorry
                 my $forward_oligo = "ACCG" . $site;
                 my $reverse_oligo = "AAAC" . revcom( $site )->seq;
 
