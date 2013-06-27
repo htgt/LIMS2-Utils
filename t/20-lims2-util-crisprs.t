@@ -7,6 +7,8 @@ use Test::Most;
 use File::Temp;
 use YAML::Any;
 
+use Data::Dumper;
+
 use_ok 'LIMS2::Util::Crisprs';
 
 dies_ok { LIMS2::Util::Crisprs->new } 'constructor dies without species';
@@ -53,40 +55,62 @@ ok -e $c->get_filename( 'csv' );
 
 #now check the data is right
 my @lines = $c->get_filename( 'csv' )->slurp( chomp => 1 );
-is scalar @lines, 2, 'correct number of lines in csv';
+is scalar @lines, 3, 'correct number of lines in csv';
 
-my @headers = qw( 
-    Gene
-    Ensembl_Gene_ID
-    Ensembl_Exon_ID
-    Exon_Rank
-    Exon_Strand
-    Crispr_Seq
-    Off_Targets_Exon
-    Off_Targets_Intron
-    Off_Targets_Intergenic
-    Total_Off_Targets
-    Forward_Oligo
-    Reverse_Oligo
+
+#NOTE:
+#the oligos might not be correct. I don't know if we need to add a G to the oligo append sequence or not
+#i need to get stuff farmed and this function isn't used currently so i'm leaving it like this.
+my @data = (
+    [ #headers
+        qw( 
+            Gene
+            Ensembl_Gene_ID
+            Ensembl_Exon_ID
+            Exon_Rank
+            Exon_Strand
+            Crispr_Seq
+            Off_Targets_Exon
+            Off_Targets_Intron
+            Off_Targets_Intergenic
+            Total_Off_Targets
+            Forward_Oligo
+            Reverse_Oligo
+        )
+    ],
+    [ #first crispr
+        'Gypa',
+        'ENSMUSG00000051839',
+        'ENSMUSE00000517176',
+        1,
+        1,
+        'CAGGAAAATCGTGTTGAATTGG (-)',
+        0,
+        1,
+        3,
+        4,
+        'ACCGCAGGAAAATCGTGTTGAAT',
+        'AAACATTCAACACGATTTTCCTG',
+    ],
+    [ #second crispr
+        'Gypa',
+        'ENSMUSG00000051839',
+        'ENSMUSE00000517176',
+        1,
+        1,
+        'AATCGTGTTGAATTGGTGACGG (-)',
+        1,
+        4,
+        12,
+        17,
+        'ACCGAATCGTGTTGAATTGGTGA',
+        'AAACTCACCAATTCAACACGATT',
+    ],
 );
 
-my @data_row = (
-    'Gypa',
-    'ENSMUSG00000051839',
-    'ENSMUSE00000517176',
-    1,
-    1,
-    'GCAGGAAAATCGTGTTGAATTGG (-)',
-    0,
-    1,
-    3,
-    4,
-    'ACCGCAGGAAAATCGTGTTGAAT',
-    'AAACATTCAACACGATTTTCCTG',
-);
-
-is join( ",", @headers  ), $lines[0], 'csv headers match'; #headers line
-is join( ",", @data_row ), $lines[1], 'csv data matches'; #data line
+is $lines[0], join( ",", @{ $data[0] } ), 'csv headers match'; #headers line
+is $lines[1], join( ",", @{ $data[1] } ), 'csv line 1 matches'; #data line
+is $lines[2], join( ",", @{ $data[2] } ), 'csv line 2 matches';
 
 note( 'Check db yaml works' );
 
@@ -94,49 +118,186 @@ ok $c->create_db_yaml, 'db yaml can be created';
 ok -e $c->get_filename( 'db' );
 
 #make sure the yaml data is what we expect for this exon
-my %data = (
-    locus => {
-        chr_end    => '80503093',
-        chr_name   => '8',
-        chr_start  => '80503071',
-        chr_strand => '-1',
-        comment    => '{Exons: 0, Introns: 1, Intergenic: 3}',
+my @db_data = (
+    { #first crispr
+      off_targets => [
+            {
+              chr_start  => 12326336,
+              chr_end    => 12326357,
+              type       => 'Exonic',
+              chr_strand => 1,
+              chr_name   => '17'
+            },
+            {
+              chr_start => 59412639,
+              chr_end => 59412660,
+              type => 'Intronic',
+              chr_strand => -1,
+              chr_name => '6'
+            },
+            {
+              chr_start => 32529603,
+              chr_end => 32529624,
+              type => 'Intronic',
+              chr_strand => -1,
+              chr_name => '16'
+            },
+            {
+              chr_start => 41095955,
+              chr_end => 41095976,
+              type => 'Intronic',
+              chr_strand => -1,
+              chr_name => '9'
+            },
+            {
+              chr_start => 40312720,
+              chr_end => 40312741,
+              type => 'Intronic',
+              chr_strand => -1,
+              chr_name => '11'
+            },
+            {
+              chr_start => 75172395,
+              chr_end => 75172416,
+              type => 'Intergenic',
+              chr_strand => 1,
+              chr_name => 'X'
+            },
+            {
+              chr_start => 15271049,
+              chr_end => 15271070,
+              type => 'Intergenic',
+              chr_strand => -1,
+              chr_name => 'X'
+            },
+            {
+              chr_start => 61607455,
+              chr_end => 61607476,
+              type => 'Intergenic',
+              chr_strand => 1,
+              chr_name => '18'
+            },
+            {
+              chr_start => 118503908,
+              chr_end => 118503929,
+              type => 'Intergenic',
+              chr_strand => 1,
+              chr_name => '7'
+            },
+            {
+              chr_start => 52180908,
+              chr_end => 52180929,
+              type => 'Intergenic',
+              chr_strand => -1,
+              chr_name => '7'
+            },
+            {
+              chr_start => 124870322,
+              chr_end => 124870343,
+              type => 'Intergenic',
+              chr_strand => -1,
+              chr_name => '7'
+            },
+            {
+              chr_start => 106107157,
+              chr_end => 106107178,
+              type => 'Intergenic',
+              chr_strand => 1,
+              chr_name => '5'
+            },
+            {
+              chr_start => 145978317,
+              chr_end => 145978338,
+              type => 'Intergenic',
+              chr_strand => -1,
+              chr_name => '1'
+            },
+            {
+              chr_start => 75375187,
+              chr_end => 75375208,
+              type => 'Intergenic',
+              chr_strand => -1,
+              chr_name => '8'
+            },
+            {
+              chr_start => 39565765,
+              chr_end => 39565786,
+              type => 'Intergenic',
+              chr_strand => 1,
+              chr_name => '13'
+            },
+            {
+              chr_start => 39158181,
+              chr_end => 39158202,
+              type => 'Intergenic',
+              chr_strand => -1,
+              chr_name => '16'
+            },
+            {
+              chr_start => 92569574,
+              chr_end => 92569595,
+              type => 'Intergenic',
+              chr_strand => 1,
+              chr_name => '3'
+            }
+                      ],
+      off_target_algorithm => 'strict',
+      off_target_outlier => '',
+      type => 'Exonic',
+      off_target_summary => '{Exons: 1, Introns: 4, Intergenic: 12}',
+      seq => 'AATCGTGTTGAATTGGTGACGG',
+      locus => {
+           chr_start  => 80503065,
+           chr_end    => 80503086,
+           chr_strand => '-1',
+           chr_name   => '8'
+        }
     },
-    off_target_outlier => '',
-    off_targets => [
-        {
-            chr_end    => '41697324',
-            chr_name   => '3',
-            chr_start  => '41697302',
-            chr_strand => '-1',
-            type       => 'Intronic',
-        },
-        {
-            chr_end    => '41256691',
-            chr_name   => '6',
-            chr_start  => '41256669',
-            chr_strand => '1',
-            type       => 'Intergenic',
-        },
-        {
-            chr_end    => '96547291',
+    { #second crispr
+        locus => {
+            chr_end    => '80503092',
             chr_name   => '8',
-            chr_start  => '96547269',
-            chr_strand => '1',
-            type       => 'Intergenic',
+            chr_start  => '80503071',
+            chr_strand => '-1',
         },
-        {
-            chr_end    => '71395183',
-            chr_name   => '15',
-            chr_start  => '71395161',
-            chr_strand => '1',
-            type       => 'Intergenic',
-        },
-    ],
-    seq  => 'GCAGGAAAATCGTGTTGAATTGG',
-    type => 'Exonic',
+        off_target_algorithm => 'strict',
+        off_target_outlier   => '',
+        off_target_summary   => '{Exons: 0, Introns: 1, Intergenic: 3}',
+        off_targets => [
+            {
+                chr_end    => '41697323',
+                chr_name   => '3',
+                chr_start  => '41697302',
+                chr_strand => '-1',
+                type       => 'Intronic',
+            },
+            {
+                chr_end    => '41256691',
+                chr_name   => '6',
+                chr_start  => '41256670',
+                chr_strand => '1',
+                type       => 'Intergenic',
+            },
+            {
+                chr_end    => '96547291',
+                chr_name   => '8',
+                chr_start  => '96547270',
+                chr_strand => '1',
+                type       => 'Intergenic',
+            },
+            {
+                chr_end    => '71395183',
+                chr_name   => '15',
+                chr_start  => '71395162',
+                chr_strand => '1',
+                type       => 'Intergenic',
+            },
+        ],
+        seq  => 'CAGGAAAATCGTGTTGAATTGG',
+        type => 'Exonic',
+    },
 );
 
-is_deeply \%data, YAML::Any::LoadFile( $c->get_filename( 'db' )->stringify ), 'db output data matches';
+is_deeply \@db_data, [ YAML::Any::LoadFile( $c->get_filename( 'db' )->stringify ) ], 'db output data matches';
 
 done_testing;

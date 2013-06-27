@@ -73,12 +73,18 @@ has species => (
 );
 
 #the number of bp at the end of a site to remove to get the seed
-#that is, $CRISPR_LENGTH - $self->non_seed_length = SEED_LENGTH
+#that is, $self->crispr_length - $self->non_seed_length = SEED_LENGTH
 has non_seed_length => (
     is       => 'rw',
     isa      => 'Int',
     default  => 7,
     required => 1
+);
+
+has crispr_length => (
+    is       => 'rw',
+    isa      => 'Int',
+    default => 22
 );
 
 has exonerate_min_score => (
@@ -137,7 +143,7 @@ sub _build_exonerate_min_score {
     my $self = shift;
 
     #this is the length of the seed multiplied by the exonerate match score
-    return (22 - $self->non_seed_length) * 5;
+    return ($self->crispr_length - $self->non_seed_length) * 5;
 }
 
 sub _build_ensembl {
@@ -322,12 +328,19 @@ sub _add_exon_data {
         #$-[0] is match start, $+[0] is match_end
         push @{ $matches->{$strand} } => $self->_create_match_hashref( $1, $exon, $-[0], $+[0] );
         $total_matches++;
+
+        #a hack to move the next search position backwards to just after the GG/CC
+        #to make sure we get any overlapping crisprs
+        pos($seq) -= ($self->crispr_length - 2);
     }
 
     while ( $seq =~ /(CC[CTGA][CTGA]{19})/g ) {
         push @{ $matches->{$comp_strand} },
             $self->_create_match_hashref( revcom( $1 )->seq, $exon, $-[0], $+[0] );
         $total_matches++;
+
+        #same as above
+        pos($seq) -= ($self->crispr_length - 2);
     }
 
     #add all the data we just collected to our hash.
@@ -653,14 +666,14 @@ sub create_db_yaml {
                     off_target_algorithm => "strict",
                     type                 => "Exonic",
                     off_target_outlier   => $outlier,
+                    off_target_summary   => "{Exons: $total_exon_off_targets, "
+                                          . "Introns: $total_intron_off_targets, "
+                                          . "Intergenic: $total_other_off_targets}", #stored as json
                     locus => {
                         chr_name   => $exon->{ chromosome },
                         chr_start  => $match->{ start },
                         chr_end    => $match->{ end },
                         chr_strand => $self->strands->{ $strand }->{ name }, #get strand as number
-                        off_target_summary    => "{Exons: $total_exon_off_targets, "
-                                    . "Introns: $total_intron_off_targets, "
-                                    . "Intergenic: $total_other_off_targets}" #stored as json
                     }
                 );
 
@@ -753,8 +766,12 @@ sub create_csv {
             my $symbol = $self->strands->{ $strand }{ symbol };
 
             for my $match ( @{ $exon->{ matches }{ $strand } } ) {
-                #the oligo sequence doesnt include the pam site or G at the start
-                my $site = substr($match->{ crispr_site }, 1, 19);
+                #the oligo sequence doesnt include the pam site.
+                my $site = substr($match->{ crispr_site }, 0, -3);
+                #NOTE:
+                #the oligos might not be correct. I don't know if we need to add a G 
+                #to the oligo append sequence or not i need to get stuff farmed and 
+                #this function isn't used currently so i'm leaving it like this. sorry
                 my $forward_oligo = "ACCG" . $site;
                 my $reverse_oligo = "AAAC" . revcom( $site )->seq;
 
