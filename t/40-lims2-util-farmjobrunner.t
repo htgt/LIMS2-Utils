@@ -59,11 +59,11 @@ use_ok 'LIMS2::Util::FarmJobRunner';
 
     ok my ( $flag, $value ) = $runner->_build_job_dependency( [124] ), "Check list with single entry";
     ok $flag eq "-w", "Check flag is correct";
-    ok $value eq "done(124)", "Check value is correct";
+    ok $value eq '"done(124)"', "Check value is correct";
 
     ok my ( $mflag, $mvalue ) = $runner->_build_job_dependency( [124, 256] ), "Check list with multiple entries";
     ok $mflag eq "-w", "Check flag is correct";
-    ok $mvalue eq "done(124) && done(256)", "Check value is correct";
+    ok $mvalue eq '"done(124) && done(256)"', "Check value is correct";
 
     #_run_cmd
 
@@ -96,7 +96,7 @@ use_ok 'LIMS2::Util::FarmJobRunner';
     ok $optional_final_cmd =~ /-e test\.err/, "Error file specified";
     ok $optional_final_cmd =~ /-q short/, "Queue specified";
     ok $optional_final_cmd =~ /4000/, "Memory specified";
-    ok $optional_final_cmd =~ /-w done\(9999\)/, "Dependency specified";
+    ok $optional_final_cmd =~ /-w "done\(9999\)"/, "Dependency specified";
 
 }
 
