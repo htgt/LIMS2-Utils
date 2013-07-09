@@ -268,7 +268,9 @@ sub get_single_exon_data {
     #get exon slice
     my $exon_slice = $self->ensembl->slice_adaptor->fetch_by_exon_stable_id( $exon_stable_id );
 
-    my $best_transcript = $self->ensembl->get_best_transcript( $exon_slice );
+    #we need the marker symbol to make sure any transcripts we get are for the right gene
+    my $exon_gene = $self->ensembl->gene_adaptor->fetch_by_exon_stable_id( $exon_stable_id )->external_name;
+    my $best_transcript = $self->ensembl->get_best_transcript( $exon_slice, $exon_gene );
 
     #we dont use get_exon_rank as there's no point looping this twice
     my $rank = 1;
@@ -278,6 +280,8 @@ sub get_single_exon_data {
             $self->_add_exon_data( $gene, $exon, $rank );
             last;
         }
+
+        $rank++;
     }
 
     return 1; #shut up perlcritic

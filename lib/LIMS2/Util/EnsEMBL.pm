@@ -70,7 +70,7 @@ sub exon_adaptor {
 }
 
 sub get_best_transcript {
-    my ( $self, $ensembl_object ) = @_;
+    my ( $self, $ensembl_object, $marker_symbol ) = @_;
 
     #$ensembl_object can be an instance of any class with a get_all_Transcripts method
     confess ref $ensembl_object . " has no get_all_Transcripts method."
@@ -81,6 +81,11 @@ sub get_best_transcript {
     for my $transcript ( @{ $ensembl_object->get_all_Transcripts } ) {
         #skip non coding transcripts
         next unless $transcript->translation;
+
+        #marker symbol is optional; it just makes sure you got a transcript for the right gene
+        if ( $marker_symbol ) {
+            next unless $transcript->get_Gene->external_name eq $marker_symbol;
+        }
 
         #if we don't have a transcript already then we'll use the first coding one.
         unless ( $best_transcript ) {
