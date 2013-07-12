@@ -22,7 +22,7 @@ has solr_uri => (
     is      => 'ro',
     isa     => Uri,
     coerce  => 1,
-    default => sub { URI->new('http://www.sanger.ac.uk/mouseportal/solr/select') }
+    default => sub { URI->new($ENV{LIMS2_SOLR_URL} || 'http://htgt-web.internal.sanger.ac.uk:8983/solr/select') }
 );
 
 has solr_rows => (
