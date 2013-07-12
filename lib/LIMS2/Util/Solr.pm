@@ -1,7 +1,7 @@
 package LIMS2::Util::Solr;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::Solr::VERSION = '0.011';
+    $LIMS2::Util::Solr::VERSION = '0.012';
 }
 ## use critic
 
@@ -28,7 +28,7 @@ has solr_uri => (
     is      => 'ro',
     isa     => Uri,
     coerce  => 1,
-    default => sub { URI->new('http://www.sanger.ac.uk/mouseportal/solr/select') }
+    default => sub { URI->new($ENV{LIMS2_SOLR_URL} || 'http://htgt-web.internal.sanger.ac.uk:8983/solr/select') }
 );
 
 has solr_rows => (
