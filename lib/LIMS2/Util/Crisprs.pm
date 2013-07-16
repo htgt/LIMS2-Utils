@@ -1,7 +1,7 @@
 package LIMS2::Util::Crisprs;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::Crisprs::VERSION = '0.012';
+    $LIMS2::Util::Crisprs::VERSION = '0.013';
 }
 ## use critic
 
@@ -137,6 +137,12 @@ has files => (
         get_filename => 'get',
         set_filename => 'set',
     }
+);
+
+has strip_utr => (
+    is      => 'rw',
+    isa     => 'Bool',
+    default => 0,
 );
 
 sub _build_model {
@@ -283,7 +289,7 @@ sub get_single_exon_data {
     for my $exon ( @{ $best_transcript->get_all_Exons } ) {
         if ( $exon->stable_id eq $exon_stable_id ) {
             #we're just doing a single exon so we don't have a design
-            $self->_add_exon_data( $gene, $exon, $rank );
+            $self->_add_exon_data( $gene, $exon, $rank, $best_transcript );
             last;
         }
 
@@ -303,7 +309,7 @@ sub get_single_design_data {
     for my $exon ( @{ $design_info->floxed_exons } ) {
         #populate the hashref with all the exon data (crispr sites, seq, etc.)
         my $rank = $design_info->get_exon_rank( $design_info->target_transcript, $exon->stable_id );
-        $self->_add_exon_data( $design_info->target_gene, $exon, $rank );
+        $self->_add_exon_data( $design_info->target_gene, $exon, $rank, $design_info->target_transcript );
 
         $exons++;
         $total_sites += $self->get_exon_data( $exon->stable_id )->{ total_sites };
@@ -315,7 +321,7 @@ sub get_single_design_data {
 }
 
 sub _add_exon_data {
-    my ( $self, $gene, $exon, $rank ) = @_;
+    my ( $self, $gene, $exon, $rank, $transcript ) = @_; #transcript is optional, only needed for strip_utr
 
     return if $self->exon_already_exists( $exon->stable_id );
 
@@ -333,7 +339,21 @@ sub _add_exon_data {
     my $total_matches = 0;
 
     #add all the matches for both strands
-    my $seq = $exon->seq->seq; #have to do this or it loops infinitely
+
+    #see if we need to strip utr from the exon sequence or not.
+    my $seq;
+    if ( $self->strip_utr ) {
+        confess "Can't strip UTR without a transcript"
+            unless $transcript;
+
+        #only take the coding_region_start to coding_region_end so we don't get any UTR
+        $seq = $exon->seq->subseq( $exon->coding_region_start($transcript),
+                                   $exon->coding_region_end($transcript) );
+    }
+    else { #otherwise just take the sequence as is
+        $seq = $exon->seq->seq;
+    }
+
     while ( $seq =~ /([CTGA]{19}[CTGA]GG)/g ) {
         #$-[0] is match start, $+[0] is match_end
         push @{ $matches->{$strand} } => $self->_create_match_hashref( $1, $exon, $-[0], $+[0] );
@@ -357,7 +377,7 @@ sub _add_exon_data {
     $self->add_exon_data( $exon->stable_id => {
         gene        => $gene->external_name,
         ens_gene_id => $gene->stable_id,
-        seq         => $exon->seq->seq,
+        seq         => $seq,
         strand      => $exon->strand,
         chromosome  => $exon->seq_region_name,
         matches     => $matches,
@@ -678,7 +698,7 @@ sub create_db_yaml {
                     off_target_outlier   => $outlier,
                     off_target_summary   => "{Exons: $total_exon_off_targets, "
                                           . "Introns: $total_intron_off_targets, "
-                                          . "Intergenic: $total_other_off_targets}", #stored as json
+                                          . "Intergenic: $total_other_off_targets}", #stored as yaml
                     locus => {
                         chr_name   => $exon->{ chromosome },
                         chr_start  => $match->{ start },
