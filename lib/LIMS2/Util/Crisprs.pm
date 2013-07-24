@@ -1,7 +1,7 @@
 package LIMS2::Util::Crisprs;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::Crisprs::VERSION = '0.013';
+    $LIMS2::Util::Crisprs::VERSION = '0.014';
 }
 ## use critic
 
@@ -126,6 +126,24 @@ has strands => (
     handles    => {
         strand_exists => 'exists',
     }
+);
+
+#if an exon has too many off-targets we put it in here so we know to skip it
+has invalid_exons => (
+    traits => [ 'Hash' ],
+    is     => 'ro',
+    isa    => 'HashRef',
+    default => sub { {} },
+    handles => {
+        exon_off_target_limit_exceeded => 'exists',
+        add_invalid_exon               => 'set',
+    }
+);
+
+has off_target_limit => (
+    is      => 'rw',
+    isa     => 'Int',
+    default => 1000
 );
 
 has files => (
@@ -275,19 +293,22 @@ sub get_single_exon_data {
     my $gene = $self->ensembl->get_gene_from_exon_id( $exon_stable_id );
 
     #get exon object from $self->ensembl
-    $self->log->info( "Fetching exon $exon_stable_id" );
+    $self->log->info( "Fetching exon $exon_stable_id (" . $gene->external_name . ")" );
 
     #get exon slice
     my $exon_slice = $self->ensembl->slice_adaptor->fetch_by_exon_stable_id( $exon_stable_id );
 
     #we need the marker symbol to make sure any transcripts we get are for the right gene
-    my $exon_gene = $self->ensembl->gene_adaptor->fetch_by_exon_stable_id( $exon_stable_id )->external_name;
-    my $best_transcript = $self->ensembl->get_best_transcript( $exon_slice, $exon_gene );
+    my $best_transcript = $self->ensembl->get_best_transcript( $exon_slice, $gene->external_name );
+
+    #my $best_transcript = $gene->canonical_transcript;
 
     #we dont use get_exon_rank as there's no point looping this twice
     my $rank = 1;
+    my $found = 0;
     for my $exon ( @{ $best_transcript->get_all_Exons } ) {
         if ( $exon->stable_id eq $exon_stable_id ) {
+            $found = 1;
             #we're just doing a single exon so we don't have a design
             $self->_add_exon_data( $gene, $exon, $rank, $best_transcript );
             last;
@@ -295,6 +316,16 @@ sub get_single_exon_data {
 
         $rank++;
     }
+
+    unless ( $found ) {
+        my $exons = join ",", map { $_->stable_id } @{ $best_transcript->get_all_Exons };
+
+        die "Couldn't find $exon_stable_id in transcript " . $best_transcript->stable_id . " ($exons)"
+
+    }
+
+    die "Couldn't find $exon_stable_id in transcript " . $best_transcript->stable_id
+        unless $found;
 
     return 1; #shut up perlcritic
 }
@@ -346,9 +377,13 @@ sub _add_exon_data {
         confess "Can't strip UTR without a transcript"
             unless $transcript;
 
-        #only take the coding_region_start to coding_region_end so we don't get any UTR
-        $seq = $exon->seq->subseq( $exon->coding_region_start($transcript),
-                                   $exon->coding_region_end($transcript) );
+        #returns undef if the whole exon is non coding
+        my ( $start, $end ) = ( $exon->coding_region_start($transcript), $exon->coding_region_end($transcript) );
+        return unless defined $start;
+
+        #only take the coding_region_start to coding_region_end so we don't get any UTR.
+        #we get our transcripts from the slice so they're relative.
+        $seq = $exon->seq->subseq( $start, $end );
     }
     else { #otherwise just take the sequence as is
         $seq = $exon->seq->seq;
@@ -536,8 +571,22 @@ sub process_exonerate {
     while ( my $line = <$fh> ) {
         next unless $line =~ /^cigar/; #we only care about the cigar string
 
-        #exon id could have multiple exons in it just f y i
-        my ( $exon_id, $start, $end, $strand, $chromosome, $location ) = $self->_process_cigar( $line );
+        #exon id could have multiple exons in it just f y i,
+        my ( $exon_ids, $start, $end, $strand, $chromosome, $location ) = $self->_process_cigar( $line );
+
+        #some can have hundreds of thousands of off-targets, at which point we don't care,
+        #so this will see if there are any valid exons left on this line
+
+        #get JUST the exon id from ENSMUSE00000661080:115834797:115834902:global_forward:0
+        #of which there could be many.
+        my @exons = grep { ! $self->exon_off_target_limit_exceeded( (split ":", $_)[0] ) } #remove invalid exons
+                        split ",", $exon_ids; #there could be multiple exons in this string
+
+        #if this is empty there weren't any valid exons on this line, so ignore it.
+        next unless @exons;
+
+        #put the string back as it was in the case of valid exons.
+        $exon_ids = join ",", @exons;
 
         #get an ensembl slice so we can attempt identify where we've hit.
         $self->log->debug( "Fetching slice: " . $start . " - " . $end . " ($strand)" );
@@ -565,7 +614,7 @@ sub process_exonerate {
             end         => $end,
             strand      => $slice->strand,
             seq         => $slice->seq,
-            crispr_site => $exon_id,
+            crispr_site => $exon_ids,
         } );
     }
 
@@ -657,6 +706,13 @@ sub add_off_target {
             $type = "Intergenic";
         }
 
+        if ( @{ $site->{off_targets}{$type} } > $self->off_target_limit ) {
+            $self->log->info( "$exon_id has exceeded " . $self->off_target_limit
+                            . " $type off targets, no more off targets will be found." );
+            $self->add_invalid_exon( $exon_id, 1 );
+            return;
+        }
+
         $self->log->debug( "Adding $type off-target for $exon_id" );
         $self->log->debug( $site->{ crispr_site } . " has off_target" );
         $self->log->debug( $off_target->{ seq } );
@@ -691,6 +747,13 @@ sub create_db_yaml {
                 my $outlier = $total_exon_off_targets > $self->outlier_limit ||
                               ($total_intron_off_targets + $total_other_off_targets) > $self->outlier_limit;
 
+                #if we stopped finding off targets the number is inaccurate, so we mark them all -1
+                if ( $self->exon_off_target_limit_exceeded( $exon_id ) ) {
+                    $total_exon_off_targets   = -1;
+                    $total_intron_off_targets = -1;
+                    $total_other_off_targets  = -1;
+                }
+
                 my %crispr_site = (
                     seq                  => $match->{ crispr_site },
                     off_target_algorithm => "strict",
@@ -711,7 +774,8 @@ sub create_db_yaml {
                 push @crisprs, \%crispr_site;
 
                 #if there are too many exonic off targets we won't store any off targets.
-                next if ( $total_exon_off_targets > $self->outlier_limit );
+                #or if it is marked as invalid
+                next if ( $total_exon_off_targets < 0 || $total_exon_off_targets > $self->outlier_limit );
 
                 #see if we should store intronic/intergenic too
                 my @to_store = ( 'Exonic' );
