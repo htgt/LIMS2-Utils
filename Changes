@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.015     2013-07-29 16:48:24 Europe/London
+
+    Bugfix: Removing UTR from exon sequences didn't work on negatively stranded genes.
+
 0.014     2013-07-24 11:57:58 Europe/London
 
 0.013     2013-07-16 17:10:49 Europe/London
