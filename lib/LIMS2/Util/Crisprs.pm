@@ -375,9 +375,25 @@ sub _add_exon_data {
         my ( $start, $end ) = ( $exon->coding_region_start($transcript), $exon->coding_region_end($transcript) );
         return unless defined $start;
 
-        #only take the coding_region_start to coding_region_end so we don't get any UTR.
-        #we get our transcripts from the slice so they're relative.
-        $seq = $exon->seq->subseq( $start, $end );
+        $self->log->info( "stripping UTR from exon seq ($start - $end)" );
+
+        #coding region start and end are always relative to the forward strand, 
+        #i tried using Bio::Location::Simple with a strand but it doesn't work.
+        #we therefore have to deal with -ve stranded exons separately.
+        if ( $exon->seq_region_strand eq "-1" ) {
+            #i dont like this at ALL. alternative is take a slice based on coords,
+            #which involves a db lookup so is probably slower...
+
+            #reverse complement so we can take the right slice,
+            my $without_utr = revcom( $exon->seq )->subseq( $start, $end );
+            #then revcom it back so the seq is on the right strand. gross
+            $seq = revcom( $without_utr )->seq;
+        }
+        else {
+            #only take the coding_region_start to coding_region_end so we don't get any UTR.
+            #we get our transcripts from the slice so they're relative.
+            $seq = $exon->seq->subseq( $start, $end );
+        }
     }
     else { #otherwise just take the sequence as is
         $seq = $exon->seq->seq;
