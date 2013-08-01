@@ -50,9 +50,11 @@ my %WriteMakefileArgs = (
     "MooseX::ClassAttribute" => 0,
     "MooseX::Log::Log4perl" => 0,
     "MooseX::Params::Validate" => 0,
+    "MooseX::SimpleConfig" => 0,
     "MooseX::Types::Path::Class::MoreCoercions" => 0,
     "MooseX::Types::URI" => 0,
     "Path::Class" => 0,
+    "Readonly" => 0,
     "Scalar::Util" => 0,
     "Sub::Exporter" => 0,
     "Template::Plugin" => 0,
@@ -64,7 +66,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.015",
+  "VERSION" => "0.016",
   "test" => {
     "TESTS" => "t/*.t"
   }
