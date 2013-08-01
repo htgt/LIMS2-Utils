@@ -1,3 +1,39 @@
+0.017     2013-08-01 14:52:39 Europe/London
+
+	Added Tarmits feed from LIMS2 script.
+
+0.016     2013-08-01 13:23:57 Europe/London
+
+    Added Tarmits module
+
+0.015     2013-07-29 16:48:24 Europe/London
+
+    Bugfix: Removing UTR from exon sequences didn't work on negatively stranded genes.
+
+0.014     2013-07-24 11:57:58 Europe/London
+
+0.013     2013-07-16 17:10:49 Europe/London
+
+0.012     2013-07-12 13:36:20 Europe/London
+
+    Changed Solr URL to the new instance on htgt-web, and added the ability to override with an env variable.
+
+0.011     2013-07-09 11:10:09 Europe/London
+
+    Added ability to give a marker symbol to get_best_transcript to ensure the transcript is for the right gene. Also fixed a bug that meant the exon rank was always 1.
+
+0.010     2013-07-04 10:52:07 Europe/London
+    
+    Added quotes around dependency criteria in FarmJobRunner
+
+0.009     2013-06-27 11:36:24 Europe/London
+
+    Relaxed crispr finding criteria.
+
+0.008     2013-06-06 09:45:59 Europe/London
+
+    Added Crisprs module and some new functionality to EnsEMBL module. 
+
 0.007     2013-05-02 07:35:10 Europe/London
 
     Added exon_adaptor to EnsEMBL utils module.

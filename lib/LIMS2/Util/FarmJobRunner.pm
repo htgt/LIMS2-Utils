@@ -1,7 +1,7 @@
 package LIMS2::Util::FarmJobRunner;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::FarmJobRunner::VERSION = '0.007';
+    $LIMS2::Util::FarmJobRunner::VERSION = '0.017';
 }
 ## use critic
 
@@ -132,7 +132,7 @@ sub _build_job_dependency {
     return () unless @{ $dependencies };
 
     #this creates a list of dependencies, for example 'done(12) && done(13) && done(14)'
-    return ( '-w', join( " && ", map { 'done(' . $_ . ')' } @{ $dependencies } ) );
+    return ( '-w', '"' . join( " && ", map { 'done(' . $_ . ')' } @{ $dependencies } ) . '"' );
 }
 
 sub _run_cmd {
@@ -203,6 +203,11 @@ Helper module for running bsub jobs from LIMS2/The VMs.
 Sets the appropriate environment for using our perlbrew install in /software.
 
 The default queue is normal, and the default memory required is 2000 MB.
+
+=head1 TODO
+
+Write a jobarray wrapper that will take a yaml file or something, so that we can support params,
+and wrap anything into a jobarray.
 
 =head1 AUTHOR
 

@@ -22,14 +22,18 @@ my %WriteMakefileArgs = (
     "ExtUtils::MakeMaker" => "6.30"
   },
   "DISTNAME" => "LIMS2-Util",
-  "EXE_FILES" => [],
+  "EXE_FILES" => [
+    "bin/tarmits_feed_wrapper.pl"
+  ],
   "LICENSE" => "perl",
   "NAME" => "LIMS2::Util",
   "PREREQ_PM" => {
     "Bio::EnsEMBL::Registry" => 0,
+    "Bio::Perl" => 0,
     "Carp" => 0,
     "Class::Data::Inheritable" => 0,
     "Const::Fast" => 0,
+    "Data::Dumper" => 0,
     "File::Which" => 0,
     "Hash::MoreUtils" => 0,
     "IO::File" => 0,
@@ -38,14 +42,21 @@ my %WriteMakefileArgs = (
     "Iterator::Simple" => 0,
     "JSON" => 0,
     "LIMS2::Exception" => 0,
+    "LIMS2::Model" => 0,
+    "LIMS2::Model::Util::DesignInfo" => 0,
     "LWP::UserAgent" => 0,
+    "List::MoreUtils" => 0,
+    "Log::Log4perl" => 0,
     "Moose" => 0,
     "Moose::Util::TypeConstraints" => 0,
     "MooseX::ClassAttribute" => 0,
+    "MooseX::Log::Log4perl" => 0,
     "MooseX::Params::Validate" => 0,
+    "MooseX::SimpleConfig" => 0,
     "MooseX::Types::Path::Class::MoreCoercions" => 0,
     "MooseX::Types::URI" => 0,
     "Path::Class" => 0,
+    "Readonly" => 0,
     "Scalar::Util" => 0,
     "Sub::Exporter" => 0,
     "Template::Plugin" => 0,
@@ -57,7 +68,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.007",
+  "VERSION" => "0.017",
   "test" => {
     "TESTS" => "t/*.t"
   }
