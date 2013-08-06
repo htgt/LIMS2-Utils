@@ -15,7 +15,10 @@ my $species = 'Mouse';
 
 my $tarmits_feed = LIMS2::Util::TarmitsFeedCreKnockin->new( { 'species' => $species, 'model' => $model, } );
 
-my $accepted_cre_clones = $tarmits_feed->accepted_clones;
+# select all the valid clones from LIMS2 into a multi-level hash (genes -> alleles -> targeting vectors -> clones)
+my $es_cre_clones = $tarmits_feed->es_clones;
 
-# now we have hash of curremt accepted clones in LIMS2, need to check each one is up to date in Tarmits
+# could print out es_cre_clones hash here, also held internally in TarmitsFeedCreKnockin instance
+
+# now we have hash of curremt es clones in LIMS2, need to insert / update them in Tarmits
 my $result = $tarmits_feed->check_clones_against_tarmits();

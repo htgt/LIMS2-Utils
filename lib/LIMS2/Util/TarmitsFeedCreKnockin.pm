@@ -7,6 +7,8 @@ use Try::Tiny;                              # Exception handling
 use LIMS2::Util::Tarmits;
 use Const::Fast;
 
+use Smart::Comments;
+
 Log::Log4perl->easy_init($DEBUG);
 
 has model => (
@@ -21,7 +23,7 @@ has species => (
     required   => 1,
 );
 
-has accepted_clones => (
+has es_clones => (
     is         => 'ro',
     isa        => 'HashRef',
     lazy_build => 1,
@@ -129,7 +131,13 @@ has count_es_cell_inserts => (
     lazy_build => 1,
 );
 
-has count_es_cell_rtp_updates => (
+has count_es_cell_rtp_updates_to_true => (
+    is         => 'rw',
+    isa        => 'Int',
+    lazy_build => 1,
+);
+
+has count_es_cell_rtp_updates_to_false => (
     is         => 'rw',
     isa        => 'Int',
     lazy_build => 1,
@@ -153,13 +161,21 @@ has count_failed_es_cell_asym_updates => (
     lazy_build => 1,
 );
 
+has count_ignored_es_cells => (
+    is         => 'rw',
+    isa        => 'Int',
+    lazy_build => 1,
+);
+
 has count_failed_es_cell_inserts => (
     is         => 'rw',
     isa        => 'Int',
     lazy_build => 1,
 );
 
-sub _build_accepted_clones {
+const my $MSG_PREFIX => 'Tarmits_Feed:';
+
+sub _build_es_clones {
     my $self = shift;
 
     $self->count_failed_allele_selects(0);
@@ -167,42 +183,42 @@ sub _build_accepted_clones {
     $self->count_failed_tv_selects(0);
     $self->count_failed_es_cell_selects(0);
 
-    my @accepted_clones_array = $self->select_accepted_clones();
+    my @es_clones_array = $self->select_es_clones();
 
-	my %accepted_clones = $self->refactor_selected_clones( @accepted_clones_array );
+	my %es_clones = $self->refactor_selected_clones( @es_clones_array );
 
-    DEBUG "TarmitsFeedCreKnockin: -------------- Select Totals -------------";
-    DEBUG "TarmitsFeedCreKnockin: Count of FAILED rows for Allele selects:"               . $self->count_failed_allele_selects;
+    INFO "$MSG_PREFIX -------------- Select Totals -------------";
+    INFO "$MSG_PREFIX Count of FAILED rows for Allele selects: "               . $self->count_failed_allele_selects;
 
     my %failed_allele_selects_copy = %{ $self->failed_allele_selects };
     foreach my $gene ( keys %failed_allele_selects_copy )
     {
-      DEBUG 'TarmitsFeedCreKnockin: Failed select for: Gene: ' . $gene . ', Design ID: ' . $failed_allele_selects_copy{$gene} . "\n";
+      INFO "$MSG_PREFIX Failed select for: Gene: $gene, Design ID: " . $failed_allele_selects_copy{$gene};
     }
 
-    DEBUG "TarmitsFeedCreKnockin: Count of FAILED rows for Targeting vector selects:"     . $self->count_failed_tv_selects;
-    DEBUG "TarmitsFeedCreKnockin: Count of FAILED rows for ES Cell clone selects:"        . $self->count_failed_es_cell_selects;
+    INFO "$MSG_PREFIX Count of FAILED rows for Targeting vector selects: "     . $self->count_failed_tv_selects;
+    INFO "$MSG_PREFIX Count of FAILED rows for ES Cell clone selects: "        . $self->count_failed_es_cell_selects;
 
-    DEBUG "TarmitsFeedCreKnockin: -------------- Selects End ---------------";
+    INFO "$MSG_PREFIX -------------- Selects End ---------------";
 
-    return \%accepted_clones;
+    return \%es_clones;
 }
 
-sub select_accepted_clones {
+sub select_es_clones {
     my $self = shift;
 
-    # fetch the list of accepted EP_PICK wells that match to Cre Knockin sponsor projects
+    # fetch the list of es EP_PICK wells that match to Cre Knockin sponsor projects
     my $sponsor_id    = 'Cre Knockin';
-    my $sql_query     = $self->sql_select_st_accepted_clones ( $sponsor_id );
+    my $sql_query     = $self->sql_select_st_es_clones ( $sponsor_id );
     my $sql_resultset = $self->run_select_query( $sql_query );
 
-    my @accepted_clones_array;
+    my @es_clones_array;
 
-    foreach my $accepted_clone ( @$sql_resultset ) {
-       push( @accepted_clones_array, $accepted_clone );
+    foreach my $es_clone ( @$sql_resultset ) {
+       push( @es_clones_array, $es_clone );
     }
 
-    return [ @accepted_clones_array ];
+    return [ @es_clones_array ];
 }
 
 # check each one is up to date in Tarmits
@@ -224,53 +240,56 @@ sub check_clones_against_tarmits {
     $self->count_found_es_cells(0);
     $self->count_not_found_es_cells(0);
     $self->count_es_cell_inserts(0);
-    $self->count_es_cell_rtp_updates(0);
+    $self->count_es_cell_rtp_updates_to_true(0);
+    $self->count_es_cell_rtp_updates_to_false(0);
     $self->count_failed_es_cell_rtp_updates(0);
     $self->count_es_cell_asym_updates(0);
     $self->count_failed_es_cell_asym_updates(0);
     $self->count_failed_es_cell_inserts(0);
+    $self->count_ignored_es_cells(0);
 
-    my %accepted_clones_data = %{ $self->accepted_clones };
+    my %es_clones_data = %{ $self->es_clones };
 
-    for my $curr_gene_mgi_id ( sort keys %accepted_clones_data ) {
+    for my $curr_gene_mgi_id ( sort keys %es_clones_data ) {
 
         $self->check_gene($curr_gene_mgi_id);
 
     }
 
-    DEBUG "TarmitsFeedCreKnockin: -------------- Tarmits update Totals ------------";
-    DEBUG "TarmitsFeedCreKnockin: Count of FAILED rows for Allele select:"                . $self->count_failed_allele_selects;
+    INFO "$MSG_PREFIX -------------- Tarmits update Totals ------------";
+    INFO "$MSG_PREFIX Count of FAILED rows for Allele select: "                . $self->count_failed_allele_selects;
 
     my %failed_allele_selects_copy = %{ $self->failed_allele_selects };
     foreach my $gene ( keys %failed_allele_selects_copy )
     {
-      DEBUG 'TarmitsFeedCreKnockin: Failed select Gene: ' . $gene . ', Design ID: ' . $failed_allele_selects_copy{$gene};
+      INFO "$MSG_PREFIX FAILED the select Gene: $gene, Design ID: " . $failed_allele_selects_copy{$gene};
     }
 
-    DEBUG "TarmitsFeedCreKnockin: Count of FAILED rows for Targeting vector selects:"     . $self->count_failed_tv_selects;
-    DEBUG "TarmitsFeedCreKnockin: Count of FAILED rows for ES Cell clone selects:"        . $self->count_failed_es_cell_selects;
+    INFO "$MSG_PREFIX Count of FAILED rows for Targeting vector selects: "     . $self->count_failed_tv_selects;
+    INFO "$MSG_PREFIX Count of FAILED rows for ES Cell clone selects: "        . $self->count_failed_es_cell_selects;
 
-    DEBUG "TarmitsFeedCreKnockin: Count of rows where Allele already in Tarnits:"         . $self->count_found_alleles;
-    DEBUG "TarmitsFeedCreKnockin: Count of rows where Allele not found in Tarmits:"       . $self->count_not_found_alleles;
-    DEBUG "TarmitsFeedCreKnockin: Count of rows where Allele was inserted:"               . $self->count_allele_inserts;
-    DEBUG "TarmitsFeedCreKnockin: Count of FAILED rows for Allele inserts:"               . $self->count_failed_allele_inserts;
+    INFO "$MSG_PREFIX Count of rows where Allele already in Tarnits: "         . $self->count_found_alleles;
+    INFO "$MSG_PREFIX Count of rows where Allele not found in Tarmits: "       . $self->count_not_found_alleles;
+    INFO "$MSG_PREFIX Count of rows where Allele was inserted: "               . $self->count_allele_inserts;
+    INFO "$MSG_PREFIX Count of FAILED rows for Allele inserts: "               . $self->count_failed_allele_inserts;
 
-    DEBUG "TarmitsFeedCreKnockin: Count of rows where Targeting vector already in Tarnits:"         . $self->count_found_tvs;
-    DEBUG "TarmitsFeedCreKnockin: Count of rows where Targeting vector not found in Tarmits:"       . $self->count_not_found_tvs;
-    DEBUG "TarmitsFeedCreKnockin: Count of rows where Targeting vector was inserted:"               . $self->count_tv_inserts;
-    DEBUG "TarmitsFeedCreKnockin: Count of rows where Targeting vector report flag was updated:"    . $self->count_tv_updates;
-    DEBUG "TarmitsFeedCreKnockin: Count of FAILED rows for Targeting vector inserts:"               . $self->count_failed_tv_inserts;
+    INFO "$MSG_PREFIX Count of rows where Targeting vector already in Tarnits: "         . $self->count_found_tvs;
+    INFO "$MSG_PREFIX Count of rows where Targeting vector not found in Tarmits: "       . $self->count_not_found_tvs;
+    INFO "$MSG_PREFIX Count of rows where Targeting vector was inserted: "               . $self->count_tv_inserts;
+    INFO "$MSG_PREFIX Count of rows where Targeting vector report flag was updated: "    . $self->count_tv_updates;
+    INFO "$MSG_PREFIX Count of FAILED rows for Targeting vector inserts: "               . $self->count_failed_tv_inserts;
 
-    DEBUG "TarmitsFeedCreKnockin: Count of rows where ES Cell already in Tarnits:"                          . $self->count_found_es_cells;
-    DEBUG "TarmitsFeedCreKnockin: Count of rows where ES Cell not found in Tarmits:"                        . $self->count_not_found_es_cells;
-    DEBUG "TarmitsFeedCreKnockin: Count of rows where ES Cell was inserted into Tarmits:"                   . $self->count_es_cell_inserts;
-    DEBUG "TarmitsFeedCreKnockin: Count of rows where ES Cell report to public flag was updated:"           . $self->count_es_cell_rtp_updates;
-    DEBUG "TarmitsFeedCreKnockin: Count of FAILED rows for ES Cell report to public flag updates:"          . $self->count_failed_es_cell_rtp_updates;
-    DEBUG "TarmitsFeedCreKnockin: Count of rows where ES Cell allele symbol superscript flag was updated:"  . $self->count_es_cell_asym_updates;
-    DEBUG "TarmitsFeedCreKnockin: Count of FAILED rows for ES Cell allele symbol superscript flag updates:" . $self->count_failed_es_cell_asym_updates;
-    DEBUG "TarmitsFeedCreKnockin: Count of FAILED rows for ES Cell inserts:"                                . $self->count_failed_es_cell_inserts;
+    INFO "$MSG_PREFIX Count of rows where ES Cell already in Tarnits: "                          . $self->count_found_es_cells;
+    INFO "$MSG_PREFIX Count of rows where ES Cell not found in Tarmits: "                        . $self->count_not_found_es_cells;
+    INFO "$MSG_PREFIX Count of rows where ES Cell was inserted into Tarmits: "                   . $self->count_es_cell_inserts;
+    INFO "$MSG_PREFIX Count of rows where ES Cell report to public flag was updated to TRUE: "   . $self->count_es_cell_rtp_updates_to_true;
+    INFO "$MSG_PREFIX Count of rows where ES Cell report to public flag was updated to FALSE: "  . $self->count_es_cell_rtp_updates_to_false;
+    INFO "$MSG_PREFIX Count of FAILED rows for ES Cell report to public flag updates: "          . $self->count_failed_es_cell_rtp_updates;
+    INFO "$MSG_PREFIX Count of rows where ES Cell allele symbol superscript flag was updated: "  . $self->count_es_cell_asym_updates;
+    INFO "$MSG_PREFIX Count of FAILED rows for ES Cell allele symbol superscript flag updates: " . $self->count_failed_es_cell_asym_updates;
+    INFO "$MSG_PREFIX Count of IGNORED rows for ES Cells: "                                      . $self->count_ignored_es_cells;
 
-    DEBUG "TarmitsFeedCreKnockin: -------------- Tarmits update End ---------------";
+    INFO "$MSG_PREFIX -------------- Tarmits update End ---------------";
 
     return;
 }
@@ -279,11 +298,11 @@ sub check_gene {
     my $self = shift;
     my $curr_gene_mgi_id = shift;
 
-    my %accepted_clones_data = %{$self->accepted_clones};
+    my %es_clones_data = %{$self->es_clones};
 
-    DEBUG "TarmitsFeedCreKnockin: Gene = $curr_gene_mgi_id:";
+    DEBUG "$MSG_PREFIX Gene = $curr_gene_mgi_id:";
 
-    for my $curr_design_id ( sort keys %{ $accepted_clones_data{ $curr_gene_mgi_id }->{ 'designs' } } ) {
+    for my $curr_design_id ( sort keys %{ $es_clones_data{ $curr_gene_mgi_id }->{ 'designs' } } ) {
 
         $self->check_allele($curr_gene_mgi_id, $curr_design_id);
 
@@ -297,11 +316,11 @@ sub check_allele {
     my $curr_gene_mgi_id = shift;
     my $curr_design_id = shift;
 
-    my %accepted_clones_data = %{$self->accepted_clones};
+    my %es_clones_data = %{$self->es_clones};
 
-    DEBUG "TarmitsFeedCreKnockin: Design = $curr_design_id: \n";
+    DEBUG "$MSG_PREFIX Design = $curr_design_id:";
 
-    my $design = $accepted_clones_data{ $curr_gene_mgi_id }->{ 'designs' }->{ $curr_design_id };
+    my $design = $es_clones_data{ $curr_gene_mgi_id }->{ 'designs' }->{ $curr_design_id };
 
     my $tm = LIMS2::Util::Tarmits->new_with_config;
 
@@ -356,13 +375,13 @@ sub check_allele {
         # fetch allele id for use when looking at targeting vectors
         $curr_allele_id = $find_allele_results->[0]->{ 'id' };
 
-        DEBUG 'TarmitsFeedCreKnockin: Found allele match, continuing. Allele ID: ' . $curr_allele_id;
+        DEBUG "$MSG_PREFIX Found allele match, continuing. Allele ID: $curr_allele_id";
     }
     else
     {
         # did not find allele in Tarmits, insert it
         $self->count_not_found_alleles($self->count_not_found_alleles + 1);
-        DEBUG 'TarmitsFeedCreKnockin: No allele match, inserting';
+        DEBUG "$MSG_PREFIX No allele match, inserting";
 
         my %insert_allele_params = (
             'project_design_id'        => $curr_design_id,
@@ -402,11 +421,11 @@ sub check_allele {
                 # store allele id for use for targeting vector inserts
                 $curr_allele_id = $insert_allele_results->{ 'id' };
 
-                DEBUG 'TarmitsFeedCreKnockin: Inserted allele successfully, continuing. Allele ID: ' . $curr_allele_id;
+                DEBUG "$MSG_PREFIX Inserted allele successfully, continuing. Allele ID: $curr_allele_id";
             }
             else {
 
-                DEBUG "TarmitsFeedCreKnockin: Check on inserted Allele failed for gene: " . $curr_gene_mgi_id . " design: ". $curr_design_id;
+                DEBUG "$MSG_PREFIX Check on inserted Allele failed for gene: $curr_gene_mgi_id design: $curr_design_id";
 
                 # increment counter
                 $self->count_failed_allele_inserts($self->count_failed_allele_inserts + 1);
@@ -414,7 +433,7 @@ sub check_allele {
             }
 
         } catch {
-            DEBUG "TarmitsFeedCreKnockin: Failed Allele insert for gene: " . $curr_gene_mgi_id . " design: ". $curr_design_id . " Exception: " . $_;
+            DEBUG "$MSG_PREFIX Failed Allele insert for gene: " . $curr_gene_mgi_id . " design: ". $curr_design_id . " Exception: " . $_;
 
             # increment counter
             $self->count_failed_allele_inserts($self->count_failed_allele_inserts + 1);
@@ -426,7 +445,7 @@ sub check_allele {
     return if $insert_error;
 
     # Cycle through the targeting vectors in the allele
-    for my $curr_targeting_vector_name ( sort keys %{ $accepted_clones_data{ $curr_gene_mgi_id }->{ 'designs' }->{ $curr_design_id }->{ 'targeting_vectors' } } ) {
+    for my $curr_targeting_vector_name ( sort keys %{ $es_clones_data{ $curr_gene_mgi_id }->{ 'designs' }->{ $curr_design_id }->{ 'targeting_vectors' } } ) {
 
         $self->check_targeting_vector($tm, $curr_gene_mgi_id, $curr_design_id, $curr_allele_id, $curr_targeting_vector_name);
 
@@ -438,11 +457,11 @@ sub check_allele {
 sub check_targeting_vector {
     my ($self, $tm, $curr_gene_mgi_id, $curr_design_id, $curr_allele_id, $curr_targeting_vector_name ) = @_;
 
-    my %accepted_clones_data = %{$self->accepted_clones};
+    my %es_clones_data = %{$self->es_clones};
 
-    DEBUG "TarmitsFeedCreKnockin: TargVect = $curr_targeting_vector_name:";
+    DEBUG "$MSG_PREFIX TargVect = $curr_targeting_vector_name:";
 
-    my $tv = $accepted_clones_data{ $curr_gene_mgi_id }->{ 'designs' }->{ $curr_design_id }->{ 'targeting_vectors' }->{ $curr_targeting_vector_name };
+    my $tv = $es_clones_data{ $curr_gene_mgi_id }->{ 'designs' }->{ $curr_design_id }->{ 'targeting_vectors' }->{ $curr_targeting_vector_name };
 
     # List of unique targeting vector features
     # name
@@ -467,12 +486,12 @@ sub check_targeting_vector {
         # fetch targeting vector id for use when looking at es cell clones
         $curr_targeting_vector_id = $tv_find_results->[0]->{ 'id' };
 
-        DEBUG 'TarmitsFeedCreKnockin: Found targeting vector match, ID: ' . $curr_targeting_vector_id . ' checking report to public flag';
+        DEBUG "$MSG_PREFIX Found targeting vector match, ID: $curr_targeting_vector_id checking report to public flag";
 
         if ( $tv_find_results->[0]->{ 'report_to_public' } == 0 ) {
 
             # update report to public flag to true
-            DEBUG 'TarmitsFeedCreKnockin: Targeting Vector report to public is currently false, need to update it to true';
+            DEBUG "$MSG_PREFIX Targeting Vector report to public is currently false, need to update it to true";
 
             try {
                 my %update_tv_params = (
@@ -484,33 +503,33 @@ sub check_targeting_vector {
 
                 if ( defined $tv_update_results && scalar @{ $tv_update_results } > 0 ) {
                     $self->count_tv_updates($self->count_tv_updates + 1);
-                    DEBUG 'TarmitsFeedCreKnockin: Updated targeting vector successfully, continuing';
+                    DEBUG "$MSG_PREFIX Updated targeting vector successfully, continuing";
                 }
                 else {
                     $self->count_failed_tv_updates($self->count_failed_tv_updates + 1);
 
-                    DEBUG 'TarmitsFeedCreKnockin: Check on update of targeting vector failed for gene: ' . $curr_gene_mgi_id . ', design: ' . $curr_design_id . ', targeting vector: ' . $curr_targeting_vector_name . ', targeting vector id: ' . $curr_targeting_vector_id;
+                    DEBUG "$MSG_PREFIX Check on update of targeting vector failed for gene: $curr_gene_mgi_id, design: $curr_design_id, targeting vector: $curr_targeting_vector_name, targeting vector id: $curr_targeting_vector_id";
                 }
             }
             catch {
                 $self->count_failed_tv_updates($self->count_failed_tv_updates + 1);
                 $insert_error = 1;
 
-                DEBUG 'TarmitsFeedCreKnockin: Failed Targeting vector insert for gene: ' . $curr_gene_mgi_id . ', design: '. $curr_design_id . ', targeting vector: ' . $curr_targeting_vector_name . ' Exception: ' . $_;
+                DEBUG "$MSG_PREFIX Failed Targeting vector insert for gene: $curr_gene_mgi_id, design: $curr_design_id, targeting vector: $curr_targeting_vector_name Exception: " . $_;
             }
         }
         else {
-            DEBUG 'TarmitsFeedCreKnockin: Targeting vector report to public flag already set, continuing';
+            DEBUG "$MSG_PREFIX Targeting vector report to public flag already set, continuing";
         }
     }
     else
     {
         # did not find targeting vector in Tarmits, insert it
         $self->count_not_found_tvs($self->count_not_found_tvs + 1);
-        DEBUG 'TarmitsFeedCreKnockin: No targeting vector match, inserting';
+        DEBUG "$MSG_PREFIX No targeting vector match, inserting";
 
         my $ikmc_proj_id = ( $tv->{ 'targeting_vector_details' }->{ 'pipeline_name' } ) . '_' . $curr_allele_id;
-        #DEBUG 'TarmitsFeedCreKnockin: ikmc_proj_id = ' . $ikmc_proj_id;
+        #DEBUG "$MSG_PREFIX ikmc_proj_id = $ikmc_proj_id";
 
         my %insert_tv_params = (
             'name'                  => $curr_targeting_vector_name,
@@ -531,11 +550,11 @@ sub check_targeting_vector {
                 # store targeting vector id for use for es cell clone checks
                 $curr_targeting_vector_id = $results_tv_insert->{ 'id' };
 
-                DEBUG 'TarmitsFeedCreKnockin: Inserted targeting vector successfully, new ID: ' . $curr_targeting_vector_id . ', continuing';
+                DEBUG "$MSG_PREFIX Inserted targeting vector successfully, new ID: $curr_targeting_vector_id, continuing";
             }
             else {
 
-                DEBUG "TarmitsFeedCreKnockin: Check on inserted targeting vector failed for gene: " . $curr_gene_mgi_id . ", design: ". $curr_design_id . ", targeting vector: " . $curr_targeting_vector_name;
+                DEBUG "$MSG_PREFIX Check on inserted targeting vector failed for gene: $curr_gene_mgi_id, design: $curr_design_id, targeting vector: $curr_targeting_vector_name";
 
                 # increment counter
                 $self->count_failed_tv_inserts($self->count_failed_tv_inserts + 1);
@@ -543,7 +562,7 @@ sub check_targeting_vector {
             }
 
         } catch {
-            DEBUG "TarmitsFeedCreKnockin: Failed Targeting vector insert for gene: " . $curr_gene_mgi_id . ", design: ". $curr_design_id . ", targeting vector: " . $curr_targeting_vector_name . " Exception: " . $_;
+            DEBUG "$MSG_PREFIX Failed Targeting vector insert for gene: $curr_gene_mgi_id, design: $curr_design_id, targeting vector: $curr_targeting_vector_name Exception: " . $_;
 
             # increment counter
             $self->count_failed_tv_inserts($self->count_failed_tv_inserts + 1);
@@ -554,7 +573,7 @@ sub check_targeting_vector {
     # do not continue on with clones for this allele and targeting vector
     return if $insert_error;
 
-    for my $curr_clone_name ( sort keys %{ $accepted_clones_data{ $curr_gene_mgi_id }->{ 'designs' }->{ $curr_design_id }->{ 'targeting_vectors' }->{ $curr_targeting_vector_name }->{ 'clones' } } ) {
+    for my $curr_clone_name ( sort keys %{ $es_clones_data{ $curr_gene_mgi_id }->{ 'designs' }->{ $curr_design_id }->{ 'targeting_vectors' }->{ $curr_targeting_vector_name }->{ 'clones' } } ) {
 
         $self->check_es_cells( $tm, $curr_gene_mgi_id, $curr_design_id, $curr_allele_id, $curr_targeting_vector_name, $curr_targeting_vector_id, $curr_clone_name );
     }
@@ -562,18 +581,20 @@ sub check_targeting_vector {
     return;
 }
 
-sub check_es_cells {  ##no critic(ProhibitManyArgs)
+sub check_es_cells { ##no critic(ProhibitManyArgs)
     my ($self, $tm, $curr_gene_mgi_id, $curr_design_id, $curr_allele_id, $curr_targeting_vector_name, $curr_targeting_vector_id, $curr_clone_name ) = @_;
     ## use critic
-    DEBUG 'TarmitsFeedCreKnockin: Clone = ' . $curr_clone_name;
+    DEBUG "$MSG_PREFIX Clone = $curr_clone_name";
 
-    my %accepted_clones_data = %{$self->accepted_clones};
+    my %es_clones_data = %{$self->es_clones};
 
-    my $clone = $accepted_clones_data{ $curr_gene_mgi_id }->{ 'designs' }->{ $curr_design_id }->{ 'targeting_vectors' }->{ $curr_targeting_vector_name }->{ 'clones' }->{ $curr_clone_name };
+    my $curr_clone = $es_clones_data{ $curr_gene_mgi_id }->{ 'designs' }->{ $curr_design_id }->{ 'targeting_vectors' }->{ $curr_targeting_vector_name }->{ 'clones' }->{ $curr_clone_name };
 
-    # List of unique clone features
-    # name
+    my $curr_clone_accepted = $curr_clone->{ 'info' }->{ 'clone_accepted' };
 
+    #DEBUG "LIMS2 clone accepted flag = $curr_clone_accepted";
+
+    # List of unique clone parameters for select
     my %find_clone_params = (
         'name_eq' => $curr_clone_name,
     );
@@ -592,138 +613,188 @@ sub check_es_cells {  ##no critic(ProhibitManyArgs)
         # fetch es cell clone id
         $curr_es_cell_clone_id = $clone_find_results->[0]->{ 'id' };
 
-        DEBUG 'TarmitsFeedCreKnockin: Found es cell clone match,ID: ' . $curr_es_cell_clone_id . ', checking report to public flag';
+        DEBUG "$MSG_PREFIX Found ES cell clone match, ID: $curr_es_cell_clone_id, checking report to public flag";
 
-        if ( $clone_find_results->[0]->{ 'report_to_public' } == 0 ) {
+        # if report to public flag matches clone accepted flag do nothing, but if different update
 
-            DEBUG 'TarmitsFeedCreKnockin: ES Cell clone report to public is currently false, need to update it to true';
+        my $tarmits_clone_report_to_public_string = $clone_find_results->[0]->{ 'report_to_public' };
+        my $tarmits_clone_report_to_public = 0;
+        if ( $tarmits_clone_report_to_public_string eq 'true' ) { $tarmits_clone_report_to_public = 1; }
 
-            try {
-                my %update_es_cell_params = (
-                    'report_to_public' => $clone->{ 'es_cell_details' }->{ 'report_to_public' },
-                );
+        #DEBUG "Tarmits clone report to public is currently = $tarmits_clone_report_to_public";
 
-                # update takes the id of the item plus the updated parameters
-                my $clone_update_resultset = $tm->update_es_cell( $curr_es_cell_clone_id, \%update_es_cell_params );
+        if ( $tarmits_clone_report_to_public != $curr_clone_accepted ) {
 
-                if ( defined $clone_update_resultset && $clone_update_resultset != 0 ) {
-                    $self->count_es_cell_rtp_updates($self->count_es_cell_rtp_updates + 1);
-                    DEBUG 'TarmitsFeedCreKnockin: Updated report to public for ES cell clone ID: ' . $curr_es_cell_clone_id . ' successfully, continuing';
-                }
-                else {
-                    $self->count_failed_es_cell_rtp_updates($self->count_failed_es_cell_rtp_updates + 1);
+            DEBUG "$MSG_PREFIX LIMS2 clone accepted flag ($curr_clone_accepted) not equal to Tarmits report to public flag ($tarmits_clone_report_to_public), updating Tarmits";
 
-                    DEBUG "TarmitsFeedCreKnockin: Check on update of report to public for ES cell clone failed for gene: " . $curr_gene_mgi_id . ", design: ". $curr_design_id . ", targeting vector: " . $curr_targeting_vector_name . ", es cell clone name: " . $curr_clone_name;
-                }
-            }
-            catch {
-                $self->count_failed_es_cell_rtp_updates($self->count_failed_es_cell_rtp_updates + 1);
+            $self->_update_clone_report_to_public_flag( $tm, $curr_es_cell_clone_id, $curr_clone_name, $curr_clone_accepted, $curr_gene_mgi_id, $curr_design_id, $curr_targeting_vector_name );
 
-                DEBUG "TarmitsFeedCreKnockin: Failed report to public update fot ES Cell clone for gene: " . $curr_gene_mgi_id . ", design: ". $curr_design_id . ", targeting vector: " . $curr_targeting_vector_name . ", es cell clone name: " . $curr_clone_name . " Exception: " . $_;
-            }
         }
         else {
-            DEBUG 'TarmitsFeedCreKnockin: ES Cells report to public flag already set, continuing';
+            DEBUG "$MSG_PREFIX ES Cells report to public flag already set to $curr_clone_accepted, continuing";
         }
 
         # check allele symbol superscript set for ES clone, if not set it
 
         if ( not defined ( $clone_find_results->[0]->{ 'allele_symbol_superscript' } ) ) {
-            DEBUG 'TarmitsFeedCreKnockin: ES Cells allele symbol superscript empty, attempting to update';
 
-            try {
-                my %update_es_cell_params = (
-                    'allele_symbol_superscript' => $clone->{ 'es_cell_details' }->{ 'allele_symbol_superscript' },
-                );
-
-                # update takes the id of the item plus the updated parameters
-                my $clone_update_resultset = $tm->update_es_cell( $curr_es_cell_clone_id, \%update_es_cell_params );
-
-                if ( defined $clone_update_resultset && $clone_update_resultset != 0 ) {
-                    $self->count_es_cell_asym_updates($self->count_es_cell_asym_updates + 1);
-                    DEBUG 'TarmitsFeedCreKnockin: Updated allele symbol superscript for ES cell clone ID: ' . $curr_es_cell_clone_id . ' successfully, continuing';
-                }
-                else {
-                    $self->count_failed_es_cell_asym_updates($self->count_failed_es_cell_asym_updates + 1);
-
-                    DEBUG "TarmitsFeedCreKnockin: Check on update of allele symbol superscript for ES cell clone failed for gene: " . $curr_gene_mgi_id . ", design: ". $curr_design_id . ", targeting vector: " . $curr_targeting_vector_name . ", es cell clone name: " . $curr_clone_name;
-                }
-            }
-            catch {
-                $self->count_failed_es_cell_asym_updates($self->count_failed_es_cell_asym_updates + 1);
-
-                DEBUG "TarmitsFeedCreKnockin: Failed allele symbol superscript update for ES Cell clone for gene: " . $curr_gene_mgi_id . ", design: ". $curr_design_id . ", targeting vector: " . $curr_targeting_vector_name . ", es cell clone name: " . $curr_clone_name . " Exception: " . $_;
-            }
+            $self->_update_clone_allele_symbol( $tm, $curr_es_cell_clone_id, $curr_clone_name, $curr_clone, $curr_gene_mgi_id, $curr_design_id, $curr_targeting_vector_name );
 
         }
         else {
-            DEBUG 'TarmitsFeedCreKnockin: ES Cells allele symbol superscript already set, continuing';
+            DEBUG "$MSG_PREFIX ES Cells allele symbol superscript already set, continuing";
         }
-
     }
     else
     {
-        # did not find es cell clone in Tarmits, insert it
-        $self->count_not_found_es_cells($self->count_not_found_es_cells + 1);
-        DEBUG 'TarmitsFeedCreKnockin: No es cell clone match, inserting';
-
-        my $ikmc_proj_id = ( $clone->{ 'es_cell_details' }->{ 'pipeline_name' } ) . '_' . $curr_allele_id;
-        #DEBUG 'TarmitsFeedCreKnockin: ikmc_proj_id = ' . $ikmc_proj_id;
-
-        my %insert_es_cell_params = (
-            'name'                  => $curr_clone_name,
-            'allele_id'             => $curr_allele_id,
-            'ikmc_project_id'       => $ikmc_proj_id,
-            'targeting_vector_id'   => $curr_targeting_vector_id,
-            'parental_cell_line'    => $clone->{ 'es_cell_details' }->{ 'parental_cell_line' },
-            'pipeline_id'           => $clone->{ 'es_cell_details' }->{ 'pipeline_id' },
-            'report_to_public'      => $clone->{ 'es_cell_details' }->{ 'report_to_public' },
-            'allele_symbol_superscript'        => $clone->{ 'es_cell_details' }->{ 'allele_symbol_superscript' },
-            # 'production_qc_five_prime_screen'  => $clone->{ 'qc_metrics' }->{ 'five_prime_screen' },
-            # 'production_qc_three_prime_screen' => $clone->{ 'qc_metrics' }->{ 'three_prime_screen' },
-            # 'production_qc_loxp_screen'        => $clone->{ 'qc_metrics' }->{ 'loxp_screen' },
-            # 'production_qc_loss_of_allele'     => $clone->{ 'qc_metrics' }->{ 'loss_of_allele' },
-            # 'production_qc_vector_integrity'   => $clone->{ 'qc_metrics' }->{ 'vector_integrity' },
-        );
-
-        try {
-            my $results_es_cell_insert = $tm->create_es_cell( \%insert_es_cell_params );
-
-            if ( defined $results_es_cell_insert && ( $results_es_cell_insert->{ 'name' } eq $curr_clone_name ) ) {
-
-                $self->count_es_cell_inserts($self->count_es_cell_inserts + 1);
-
-                # store es cell clone id
-                $curr_es_cell_clone_id = $results_es_cell_insert->{ 'id' };
-
-                DEBUG 'TarmitsFeedCreKnockin: Inserted es cell clone successfully, new ID: ' . $curr_es_cell_clone_id . ', continuing';
-            }
-            else {
-
-                DEBUG "TarmitsFeedCreKnockin: Check on inserted es cell clone failed for gene: " . $curr_gene_mgi_id . ", design: ". $curr_design_id . ", targeting vector: " . $curr_targeting_vector_name . ", es cell clone name: " . $curr_clone_name;
-
-                # increment counter
-                $self->count_failed_es_cell_inserts($self->count_failed_es_cell_inserts + 1);
-            }
-
-        } catch {
-            DEBUG "TarmitsFeedCreKnockin: Failed ES Cell clone insert for gene: " . $curr_gene_mgi_id . ", design: ". $curr_design_id . ", targeting vector: " . $curr_targeting_vector_name . ", es cell clone name: " . $curr_clone_name . " Exception: " . $_;
-
-            # increment counter
-            $self->count_failed_es_cell_inserts($self->count_failed_es_cell_inserts + 1);
+        # did not find es cell clone in Tarmits, insert it but ONLY if accepted
+        if ( $curr_clone_accepted ) {
+            $self->count_not_found_es_cells($self->count_not_found_es_cells + 1);
+            _insert_clone ( $tm, $curr_es_cell_clone_id, $curr_clone_name, $curr_clone, $curr_gene_mgi_id, $curr_design_id, $curr_allele_id, $curr_targeting_vector_name, $curr_targeting_vector_id );
+        }
+        else {
+            DEBUG "$MSG_PREFIX Clone not accepted in LIMS2 and not in Tarnits: ignore";
+            $self->count_ignored_es_cells($self->count_ignored_es_cells + 1);
         }
     }
 
     return;
 }
 
+sub _update_clone_report_to_public_flag { ##no critic(ProhibitManyArgs)
+    my ( $self, $tm, $curr_es_cell_clone_id, $curr_clone_name, $curr_clone_accepted, $curr_gene_mgi_id, $curr_design_id, $curr_targeting_vector_name ) = @_;
+    ## use critic
+
+    DEBUG "$MSG_PREFIX ES Cell clone report to public flag does not match state in LIMS2, attempting to update";
+
+    try {
+        my %update_es_cell_params = (
+            'report_to_public' => $curr_clone_accepted,
+        );
+
+        # update takes the id of the item plus the updated parameters
+        my $clone_update_resultset = $tm->update_es_cell( $curr_es_cell_clone_id, \%update_es_cell_params );
+
+        if ( defined $clone_update_resultset && $clone_update_resultset != 0 ) {
+            if ( $curr_clone_accepted ) {
+                $self->count_es_cell_rtp_updates_to_true($self->count_es_cell_rtp_updates_to_true + 1);
+            }
+            else {
+                $self->count_es_cell_rtp_updates_to_false($self->count_es_cell_rtp_updates_to_false + 1);
+            }
+
+            DEBUG "$MSG_PREFIX Updated report to public for ES cell clone ID: $curr_es_cell_clone_id to value $curr_clone_accepted, continuing";
+        }
+        else {
+            $self->count_failed_es_cell_rtp_updates($self->count_failed_es_cell_rtp_updates + 1);
+
+            DEBUG "$MSG_PREFIX Check on update of report to public for ES cell clone failed for gene: $curr_gene_mgi_id, design: $curr_design_id, targeting vector: $curr_targeting_vector_name, es cell clone name: $curr_clone_name, es cell accepted: $curr_clone_accepted";
+        }
+    }
+    catch {
+        $self->count_failed_es_cell_rtp_updates($self->count_failed_es_cell_rtp_updates + 1);
+
+        DEBUG "$MSG_PREFIX Failed report to public update for ES Cell clone for gene: $curr_gene_mgi_id, design: $curr_design_id, targeting vector: $curr_targeting_vector_name, es cell clone name: $curr_clone_name, es cell accepted: $curr_clone_accepted Exception: " . $_;
+    };
+
+    return;
+}
+
+sub _update_clone_allele_symbol { ##no critic(ProhibitManyArgs)
+    my ( $self, $tm, $curr_es_cell_clone_id, $curr_clone_name, $curr_clone, $curr_gene_mgi_id, $curr_design_id, $curr_targeting_vector_name ) = @_;
+    ## use critic
+
+    DEBUG "$MSG_PREFIX ES Cells allele symbol superscript empty, attempting to update";
+
+    try {
+        my %update_es_cell_params = (
+            'allele_symbol_superscript' => $curr_clone->{ 'es_cell_details' }->{ 'allele_symbol_superscript' },
+        );
+
+        # update takes the id of the item plus the updated parameters
+        my $clone_update_resultset = $tm->update_es_cell( $curr_es_cell_clone_id, \%update_es_cell_params );
+
+        if ( defined $clone_update_resultset && $clone_update_resultset != 0 ) {
+            $self->count_es_cell_asym_updates($self->count_es_cell_asym_updates + 1);
+            DEBUG "$MSG_PREFIX Updated allele symbol superscript for ES cell clone ID: $curr_es_cell_clone_id successfully, continuing";
+        }
+        else {
+            $self->count_failed_es_cell_asym_updates($self->count_failed_es_cell_asym_updates + 1);
+
+            DEBUG "$MSG_PREFIX Check on update of allele symbol superscript for ES cell clone failed for gene: $curr_gene_mgi_id, design: $curr_design_id, targeting vector: $curr_targeting_vector_name, es cell clone name: $curr_clone_name";
+        }
+    }
+    catch {
+        $self->count_failed_es_cell_asym_updates($self->count_failed_es_cell_asym_updates + 1);
+
+        DEBUG "$MSG_PREFIX Failed allele symbol superscript update for ES Cell clone for gene: $curr_gene_mgi_id, design: $curr_design_id, targeting vector: $curr_targeting_vector_name, es cell clone name: $curr_clone_name Exception: " . $_;
+    };
+
+    return;
+}
+
+sub _insert_clone { ##no critic(ProhibitManyArgs)
+    my ( $self, $tm, $curr_es_cell_clone_id, $curr_clone_name, $curr_clone, $curr_gene_mgi_id, $curr_design_id, $curr_allele_id, $curr_targeting_vector_name, $curr_targeting_vector_id ) = @_;
+    ## use critic
+
+    DEBUG "$MSG_PREFIX Inserting new accepted es clone";
+
+    my $ikmc_proj_id = ( $curr_clone->{ 'es_cell_details' }->{ 'pipeline_name' } ) . '_' . $curr_allele_id;
+    #DEBUG "$MSG_PREFIX ikmc_proj_id = $ikmc_proj_id";
+
+    my %insert_es_cell_params = (
+        'name'                  => $curr_clone_name,
+        'allele_id'             => $curr_allele_id,
+        'ikmc_project_id'       => $ikmc_proj_id,
+        'targeting_vector_id'   => $curr_targeting_vector_id,
+        'parental_cell_line'    => $curr_clone->{ 'es_cell_details' }->{ 'parental_cell_line' },
+        'pipeline_id'           => $curr_clone->{ 'es_cell_details' }->{ 'pipeline_id' },
+        'report_to_public'      => $curr_clone->{ 'es_cell_details' }->{ 'report_to_public' },
+        'allele_symbol_superscript'        => $curr_clone->{ 'es_cell_details' }->{ 'allele_symbol_superscript' },
+        # 'production_qc_five_prime_screen'  => $clone->{ 'qc_metrics' }->{ 'five_prime_screen' },
+        # 'production_qc_three_prime_screen' => $clone->{ 'qc_metrics' }->{ 'three_prime_screen' },
+        # 'production_qc_loxp_screen'        => $clone->{ 'qc_metrics' }->{ 'loxp_screen' },
+        # 'production_qc_loss_of_allele'     => $clone->{ 'qc_metrics' }->{ 'loss_of_allele' },
+        # 'production_qc_vector_integrity'   => $clone->{ 'qc_metrics' }->{ 'vector_integrity' },
+    );
+
+    try {
+        my $results_es_cell_insert = $tm->create_es_cell( \%insert_es_cell_params );
+
+        if ( defined $results_es_cell_insert && ( $results_es_cell_insert->{ 'name' } eq $curr_clone_name ) ) {
+
+            $self->count_es_cell_inserts($self->count_es_cell_inserts + 1);
+
+            # store es cell clone id
+            $curr_es_cell_clone_id = $results_es_cell_insert->{ 'id' };
+
+            DEBUG "$MSG_PREFIX Inserted es cell clone successfully, new ID: $curr_es_cell_clone_id, continuing";
+        }
+        else {
+
+            DEBUG "$MSG_PREFIX Check on inserted es cell clone failed for gene: $curr_gene_mgi_id, design: $curr_design_id, targeting vector: $curr_targeting_vector_name, es cell clone name: $curr_clone_name";
+
+            # increment counter
+            $self->count_failed_es_cell_inserts($self->count_failed_es_cell_inserts + 1);
+        }
+
+    } catch {
+        DEBUG "$MSG_PREFIX Failed ES Cell clone insert for gene: $curr_gene_mgi_id, design: $curr_design_id, targeting vector: $curr_targeting_vector_name, es cell clone name: $curr_clone_name Exception: " . $_;
+
+        # increment counter
+        $self->count_failed_es_cell_inserts($self->count_failed_es_cell_inserts + 1);
+    };
+
+    return;
+}
+
 sub refactor_selected_clones {
     my $self = shift;
-    my $accepted_clones_array = shift;
+    my $es_clones_array = shift;
 
     my %results_refactored;
 
-    RESULTS_LOOP: foreach my $result (@$accepted_clones_array) {
+    RESULTS_LOOP: foreach my $result (@$es_clones_array) {
 
         my $is_error = 0;
 
@@ -845,7 +916,7 @@ sub refactor_selected_clones {
 
             } catch {
 
-                DEBUG "TarmitsFeedCreKnockin: Failed Allele selection for gene: " . $result->{ 'design_gene_id' } . " design: ". $result->{ 'design_id' } . " Exception: " . $_;
+                DEBUG "$MSG_PREFIX Failed Allele selection for gene: " . $result->{ 'design_gene_id' } . " design: ". $result->{ 'design_id' } . " Exception: " . $_;
 
                 # increment counter
                 $self->count_failed_allele_selects($self->count_failed_allele_selects + 1);
@@ -913,7 +984,7 @@ sub refactor_selected_clones {
             $new_clone{ 'info' }->{ 'clone_plate_name' }   = $result->{ 'clone_plate_name' };
             $new_clone{ 'info' }->{ 'clone_well_id' }      = $result->{ 'clone_well_id' };
             $new_clone{ 'info' }->{ 'clone_well_name' }    = $result->{ 'clone_well_name' };
-            #$new_clone{ '' }    = $result->{ '' };
+            $new_clone{ 'info' }->{ 'clone_accepted' }     = $result->{ 'clone_accepted' };
 
             my %es_cell_details;
             # ES Cells (multiple rows)
@@ -939,8 +1010,8 @@ sub refactor_selected_clones {
             #   IKMC Project ID           - e.g. 125168                  -> created at targeting vector insert time
             #$es_cells{ 'ikmc_project_id' }           = 'tbc';
 
-            #   Report to public          - e.g. boolean, tick or cross  -> set to true
-            $es_cell_details{ 'report_to_public' }          = 1;
+            #   Report to public          - e.g. boolean, same as accepted flag so use that
+            #$es_cell_details{ 'report_to_public' }          = $result->{ 'clone_accepted' };
 
             $new_clone{ 'es_cell_details' }                 = { %es_cell_details };
 
@@ -1133,7 +1204,7 @@ sub run_select_query {
 }
 
 # Clones
-sub sql_select_st_accepted_clones {
+sub sql_select_st_es_clones {
     my ( $self, $sponsor_id ) = @_;
 
     my $species_id = $self->species;
@@ -1187,6 +1258,7 @@ SELECT pr.project_id
 , s.ep_pick_plate_id AS clone_plate_id
 , s.ep_pick_well_name AS clone_well_name
 , s.ep_pick_well_id AS clone_well_id
+, s.ep_pick_well_accepted AS clone_accepted
 FROM summaries s
 INNER JOIN project_requests pr ON s.design_gene_id = pr.gene_id
 WHERE s.design_type IN (SELECT design_type FROM mutation_design_types WHERE mutation_id = pr.mutation_type)
@@ -1225,7 +1297,7 @@ AND (
      )
     )
 )
-AND s.ep_pick_well_accepted = true
+AND s.ep_pick_well_id > 0
 GROUP by pr.project_id
 , s.design_id
 , s.design_name
@@ -1253,6 +1325,7 @@ GROUP by pr.project_id
 , s.ep_pick_plate_id 
 , s.ep_pick_well_name
 , s.ep_pick_well_id
+, s.ep_pick_well_accepted
 ORDER BY pr.project_id
 , s.design_id
 , s.design_gene_id
