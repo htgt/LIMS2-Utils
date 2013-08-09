@@ -35,6 +35,7 @@ my %WriteMakefileArgs = (
     "Const::Fast" => 0,
     "Data::Dumper" => 0,
     "File::Which" => 0,
+    "Getopt::Long" => 0,
     "Hash::MoreUtils" => 0,
     "IO::File" => 0,
     "IO::String" => 0,
@@ -68,7 +69,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.017",
+  "VERSION" => "0.018",
   "test" => {
     "TESTS" => "t/*.t"
   }

@@ -25,6 +25,7 @@ requires:
   Const::Fast: 0
   Data::Dumper: 0
   File::Which: 0
+  Getopt::Long: 0
   Hash::MoreUtils: 0
   IO::File: 0
   IO::String: 0
@@ -57,4 +58,4 @@ requires:
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.017
+version: 0.018
