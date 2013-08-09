@@ -1,5 +1,8 @@
 {{$NEXT}}
 
+0.018     2013-08-09 09:46:44 Europe/London
+	Added functionality to Tarmits feed to update Tarmits for  non-accepted clones in LIMS2
+
 0.017     2013-08-01 14:52:39 Europe/London
 
 	Added Tarmits feed from LIMS2 script.
