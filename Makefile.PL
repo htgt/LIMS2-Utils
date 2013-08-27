@@ -22,7 +22,9 @@ my %WriteMakefileArgs = (
     "ExtUtils::MakeMaker" => "6.30"
   },
   "DISTNAME" => "LIMS2-Util",
-  "EXE_FILES" => [],
+  "EXE_FILES" => [
+    "bin/tarmits_feed_wrapper.pl"
+  ],
   "LICENSE" => "perl",
   "NAME" => "LIMS2::Util",
   "PREREQ_PM" => {
@@ -33,6 +35,8 @@ my %WriteMakefileArgs = (
     "Const::Fast" => 0,
     "Data::Dumper" => 0,
     "File::Which" => 0,
+    "Getopt::Long" => 0,
+    "HTTP::Request" => 0,
     "Hash::MoreUtils" => 0,
     "IO::File" => 0,
     "IO::String" => 0,
@@ -57,6 +61,7 @@ my %WriteMakefileArgs = (
     "Readonly" => 0,
     "Scalar::Util" => 0,
     "Sub::Exporter" => 0,
+    "Template" => 0,
     "Template::Plugin" => 0,
     "Try::Tiny" => 0,
     "URI" => 0,
@@ -66,7 +71,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.016",
+  "VERSION" => "0.019",
   "test" => {
     "TESTS" => "t/*.t"
   }
