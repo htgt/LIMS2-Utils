@@ -87,6 +87,10 @@ sub submit {
         push @bsub, $self->_build_job_dependency( $args{ dependencies } );
     }
 
+    #
+    #TODO: add ' around cmd
+    #
+
     #add the actual command at the very end.
     push @bsub, @{ $args{ cmd } };
 

@@ -21,7 +21,9 @@ use Log::Log4perl qw(:easy);
 with 'MooseX::Log::Log4perl';
 
 BEGIN {
-    Log::Log4perl->easy_init( { level => $DEBUG } );
+    unless ( Log::Log4perl->initialized ) {
+        Log::Log4perl->easy_init( { level => $DEBUG } );
+    }
 }
 
 #we hammer the ensembl db so set these env vars to use the sanger only mirror:

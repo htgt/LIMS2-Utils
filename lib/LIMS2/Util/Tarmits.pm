@@ -11,6 +11,8 @@ use JSON;
 use Readonly;
 require URI;
 
+use Log::Log4perl qw(:easy);
+
 #
 # Note:
 #   this module is duplicated in svn at:
@@ -18,6 +20,12 @@ require URI;
 #
 
 with qw( MooseX::SimpleConfig MooseX::Log::Log4perl );
+
+BEGIN {
+    unless ( Log::Log4perl->initialized ) {
+        Log::Log4perl->easy_init( { level => $DEBUG } );
+    }
+}
 
 #we have to make a subtype instead of just using URI as it has no coercions.
 subtype 'LIMS2::Util::Tarmits::URI' => as class_type('URI');
