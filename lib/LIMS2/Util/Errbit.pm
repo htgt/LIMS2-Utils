@@ -71,6 +71,14 @@ has unknown_line => (
     default  => sub { return { method => "unknown", file => "unknown" } }
 );
 
+#if an error doesn't start with Caught exception then we'll skip it.
+#this is because in lims2 any validation errors cause an internal server error 
+has skip_unknown_errors => (
+    is      => 'rw',
+    isa     => 'Bool',
+    default => 1
+);
+
 =item _build_xml_template
 
 Returns an xml string intended to be processed by template toolkit
@@ -143,6 +151,12 @@ sub submit_errors {
     for my $error ( @{ $errors } ) {
         $self->log->debug( "Processing $error" );
 
+        #skip errors that don't look valid if the option is set
+        if ( $self->skip_unknown_errors && $error !~ /^Caught exception/ ) {
+            $self->log->warn( "$error is not a valid exception, skipping." );
+            next;
+        }
+
         my $data = $self->process_error( $error );
 
         #set the errbit parameters unrelated to the error
@@ -170,7 +184,6 @@ sub submit_errors {
                        . "<br/>" . $res->as_string;
     }
 
-    #keep perlcritic quiet
     return;
 }
 
@@ -244,6 +257,7 @@ sub _process_exception_line {
     #Caught exception in LIMS2::WebApp::Controller::User::QC->index "ERROR MSG 
     #at /opt/t87/global/software/LIMS2/WebApp/Controller/User/QC.pm line 53.
     ##no critic (ProhibitComplexRegexes)
+    #if this regex changes you will also need to change the next statement in submit errors
     if ( $error =~ /^Caught exception in ([^\s]+)->([^\s]+) "(.+?) at ([^\s]+) line (\d+)/ ) {
         #there are more here than we actually use in case we need them later
         my ( $class, $method, $message, $file, $line ) = ( $1, $2, $3, $4, $5 );
