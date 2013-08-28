@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.020     2013-08-28 10:39:23 Europe/London
+
+    Updated Errbit module to automatically skip errors that aren't exceptions
+
 0.019     2013-08-27 11:48:43 Europe/London
 
     Added check to see if log4perl is already initialized.
