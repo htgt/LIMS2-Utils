@@ -23,24 +23,18 @@ BEGIN {
 }
 
 has '+configfile' => ( default => $ENV{ LIMS2_ERRBIT_CONFIG } );
-#lims2-errbit.conf:
-#---
-#api_key: '10acfa689b4fc5350a9cabebc5bc9c2c'
-#url: 'http://htgt1.internal.sanger.ac.uk:4007/notifier_api/v2/notices'
 
 has url => (
     is       => 'ro',
     isa      => Uri,
     coerce   => 1,
     required => 1,
-    #default => "http://htgt1.internal.sanger.ac.uk:4007/notifier_api/v2/notices",
 );
 
 has api_key => (
     is       => 'rw',
     isa      => 'Str',
     required => 1,
-    #default => '10acfa689b4fc5350a9cabebc5bc9c2c',
 );
 
 has user_agent => (
