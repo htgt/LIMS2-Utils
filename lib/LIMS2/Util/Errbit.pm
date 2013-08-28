@@ -1,7 +1,7 @@
 package LIMS2::Util::Errbit;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::Errbit::VERSION = '0.019';
+    $LIMS2::Util::Errbit::VERSION = '0.020';
 }
 ## use critic
 
@@ -29,24 +29,18 @@ BEGIN {
 }
 
 has '+configfile' => ( default => $ENV{ LIMS2_ERRBIT_CONFIG } );
-#lims2-errbit.conf:
-#---
-#api_key: '10acfa689b4fc5350a9cabebc5bc9c2c'
-#url: 'http://htgt1.internal.sanger.ac.uk:4007/notifier_api/v2/notices'
 
 has url => (
     is       => 'ro',
     isa      => Uri,
     coerce   => 1,
     required => 1,
-    #default => "http://htgt1.internal.sanger.ac.uk:4007/notifier_api/v2/notices",
 );
 
 has api_key => (
     is       => 'rw',
     isa      => 'Str',
     required => 1,
-    #default => '10acfa689b4fc5350a9cabebc5bc9c2c',
 );
 
 has user_agent => (
@@ -81,6 +75,14 @@ has unknown_line => (
     is       => 'ro',
     isa      => 'HashRef',
     default  => sub { return { method => "unknown", file => "unknown" } }
+);
+
+#if an error doesn't start with Caught exception then we'll skip it.
+#this is because in lims2 any validation errors cause an internal server error 
+has skip_unknown_errors => (
+    is      => 'rw',
+    isa     => 'Bool',
+    default => 1
 );
 
 =item _build_xml_template
@@ -155,6 +157,12 @@ sub submit_errors {
     for my $error ( @{ $errors } ) {
         $self->log->debug( "Processing $error" );
 
+        #skip errors that don't look valid if the option is set
+        if ( $self->skip_unknown_errors && $error !~ /^Caught exception/ ) {
+            $self->log->warn( "$error is not a valid exception, skipping." );
+            next;
+        }
+
         my $data = $self->process_error( $error );
 
         #set the errbit parameters unrelated to the error
@@ -182,7 +190,6 @@ sub submit_errors {
                        . "<br/>" . $res->as_string;
     }
 
-    #keep perlcritic quiet
     return;
 }
 
@@ -256,6 +263,7 @@ sub _process_exception_line {
     #Caught exception in LIMS2::WebApp::Controller::User::QC->index "ERROR MSG 
     #at /opt/t87/global/software/LIMS2/WebApp/Controller/User/QC.pm line 53.
     ##no critic (ProhibitComplexRegexes)
+    #if this regex changes you will also need to change the next statement in submit errors
     if ( $error =~ /^Caught exception in ([^\s]+)->([^\s]+) "(.+?) at ([^\s]+) line (\d+)/ ) {
         #there are more here than we actually use in case we need them later
         my ( $class, $method, $message, $file, $line ) = ( $1, $2, $3, $4, $5 );
