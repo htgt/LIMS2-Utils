@@ -15,10 +15,11 @@ use Getopt::Long;                                   # Command line options
 #  Variables
 #---------------------------------------------------------------------
 
-my $gene_id = 0;                                    # MGI gene ID
-my $model = LIMS2::Model->new( user => 'tasks' );   # LIMS2 Model
-my $species = 'Mouse';                              # Species
-my $loglevel = $INFO;                               # Logging level
+my $gene_id       = 0;                                    # MGI gene ID
+my $force_updates = 0;                                    # force genbank and project ID updates ( 1 for yes, default 0 no)
+my $model         = LIMS2::Model->new( user => 'tasks' ); # LIMS2 Model
+my $species       = 'Mouse';                              # Species
+my $loglevel      = $INFO;                                # Logging level
 
 #---------------------------------------------------------------------
 #  Check for input of single gene ID or if we are processing all genes
@@ -29,6 +30,7 @@ GetOptions(
 #    'man'              => sub { pod2usage( -verbose => 2 ) },
     'debug'            => sub { $loglevel = $DEBUG },
     'gene_id=s'        => \$gene_id,
+    'force_updates'    => \$force_updates,
 );
 
 #---------------------------------------------------------------------
@@ -46,7 +48,12 @@ Log::Log4perl->easy_init( \%log4perl );
 #  Create a new connection Model to link to DB
 #---------------------------------------------------------------------
 
-my $tarmits_feed = LIMS2::Util::TarmitsFeedCreKnockin->new( { 'species' => $species, 'model' => $model, 'gene_id' => $gene_id, } );
+my $tarmits_feed = LIMS2::Util::TarmitsFeedCreKnockin->new( {
+	'species'       => $species,
+	'model'         => $model,
+	'gene_id'       => $gene_id,
+	'force_updates' => $force_updates,
+	} );
 
 #---------------------------------------------------------------------
 # select all the valid clones from LIMS2 into a multi-level hash
