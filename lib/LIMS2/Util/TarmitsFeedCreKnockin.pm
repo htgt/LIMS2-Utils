@@ -68,32 +68,61 @@ has curr_design => (
     required   => 0,
 );
 
-has curr_allele_id => (
+# allele (dre) attributes
+has curr_allele_dre_id => (
     is         => 'rw',
     isa        => 'Maybe[Str]',
     required   => 0,
 );
 
-has curr_allele_genbank_exists => (
+has curr_allele_dre_genbank_exists => (
     is         => 'rw',
     isa        => 'Int',
     default    => 0,
     required   => 0,
 );
 
-has curr_allele_genbank_updated => (
+has curr_allele_dre_genbank_updated => (
     is         => 'rw',
     isa        => 'Int',
     default    => 0,
     required   => 0,
 );
 
-has curr_allele_genbank_db_id => (
+has curr_allele_dre_genbank_db_id => (
     is         => 'rw',
     isa        => 'Maybe[Int]',
     required   => 0,
 );
 
+# allele (no dre) attributes
+has curr_allele_no_dre_id => (
+    is         => 'rw',
+    isa        => 'Maybe[Str]',
+    required   => 0,
+);
+
+has curr_allele_no_dre_genbank_exists => (
+    is         => 'rw',
+    isa        => 'Int',
+    default    => 0,
+    required   => 0,
+);
+
+has curr_allele_no_dre_genbank_updated => (
+    is         => 'rw',
+    isa        => 'Int',
+    default    => 0,
+    required   => 0,
+);
+
+has curr_allele_no_dre_genbank_db_id => (
+    is         => 'rw',
+    isa        => 'Maybe[Int]',
+    required   => 0,
+);
+
+# targeting vector attributes
 has curr_targeting_vector_id => (
     is         => 'rw',
     isa        => 'Maybe[Str]',
@@ -112,6 +141,7 @@ has curr_targeting_vector_name => (
     required   => 0,
 );
 
+# es cell clone attributes
 has curr_es_cell_clone_id => (
     is         => 'rw',
     isa        => 'Maybe[Str]',
@@ -137,6 +167,14 @@ has curr_clone_accepted => (
     required   => 0,
 );
 
+has curr_clone_has_dre => (
+    is         => 'rw',
+    isa        => 'Int',
+    default    => 0,
+    required   => 0,
+);
+
+# to force updates
 has force_updates => (
     is         => 'rw',
     isa        => 'Int',
@@ -146,11 +184,16 @@ has force_updates => (
 
 # multiple counters to track what is done
 for my $name (
-    qw( counter_failed_allele_selects
-        counter_found_alleles
-        counter_not_found_alleles
-        counter_allele_inserts
-        counter_failed_allele_inserts
+    qw( counter_failed_no_dre_allele_selects
+        counter_found_no_dre_alleles
+        counter_not_found_no_dre_alleles
+        counter_no_dre_allele_inserts
+        counter_failed_no_dre_allele_inserts
+        counter_failed_dre_allele_selects
+        counter_found_dre_alleles
+        counter_not_found_dre_alleles
+        counter_dre_allele_inserts
+        counter_failed_dre_allele_inserts
         counter_failed_tv_selects
         counter_found_tvs
         counter_not_found_tvs
@@ -168,17 +211,25 @@ for my $name (
         counter_es_cell_rtp_updates_to_false
         counter_es_cell_ikmc_proj_id_updates
         counter_failed_es_cell_ikmc_proj_id_updates
+        counter_es_cell_allele_id_updates
+        counter_failed_es_cell_allele_id_updates
         counter_failed_es_cell_rtp_updates
         counter_es_cell_asym_updates
         counter_failed_es_cell_asym_updates
         counter_ignored_es_cells
         counter_failed_es_cell_inserts
-        counter_successful_genbank_checks
-        counter_failed_genbank_checks
-        counter_successful_genbank_file_inserts
-        counter_failed_genbank_file_inserts
-        counter_successful_genbank_file_updates
-        counter_failed_genbank_file_updates
+        counter_successful_no_dre_genbank_checks
+        counter_failed_no_dre_genbank_checks
+        counter_successful_no_dre_genbank_file_inserts
+        counter_failed_no_dre_genbank_file_inserts
+        counter_successful_no_dre_genbank_file_updates
+        counter_failed_no_dre_genbank_file_updates
+        counter_successful_dre_genbank_checks
+        counter_failed_dre_genbank_checks
+        counter_successful_dre_genbank_file_inserts
+        counter_failed_dre_genbank_file_inserts
+        counter_successful_dre_genbank_file_updates
+        counter_failed_dre_genbank_file_updates
         )
     ) {
     my $inc_name = 'inc_'.$name;
@@ -216,7 +267,7 @@ sub _build_es_clones {
     }
 
     INFO "-------------- Select Totals -------------";
-    INFO "Count of FAILED rows for Allele selects: "              .$self->counter_failed_allele_selects;
+    INFO "Count of FAILED rows for Allele selects: "              .$self->counter_failed_no_dre_allele_selects;
 
     my %failed_allele_selects_copy = %{ $self->failed_allele_selects };
     foreach my $gene ( keys %failed_allele_selects_copy )
@@ -244,15 +295,18 @@ sub check_clones_against_tarmits {
     my ( $self ) = @_;
 
     for my $gene_mgi_id ( sort keys %{ $self->es_clones } ) {
+
         INFO "Processing gene ID: ".$gene_mgi_id;
+
         $self->curr_gene_mgi_id ( $gene_mgi_id );
+
         $self->_check_gene_against_tarmits();
     }
 
     INFO "-------------- Tarmits update Totals ------------";
 
     # counters from selection of data from LIMS2
-    INFO "Count of FAILED rows for Allele select: "                                   .$self->counter_failed_allele_selects;
+    INFO "Count of FAILED rows for Allele select: "                                   .$self->counter_failed_no_dre_allele_selects;
     my %failed_allele_selects_copy = %{ $self->failed_allele_selects };
     foreach my $gene ( keys %failed_allele_selects_copy )
     {
@@ -262,17 +316,29 @@ sub check_clones_against_tarmits {
     INFO "Count of FAILED rows for ES Cell clone selects: "                           .$self->counter_failed_es_cell_selects;
     INFO "-------------------";
     # counters from tarmits updates/inserts for alleles
-    INFO "Count of rows where Allele already in Tarnits: "                            .$self->counter_found_alleles;
-    INFO "Count of rows where Allele not found in Tarmits: "                          .$self->counter_not_found_alleles;
-    INFO "Count of rows where Allele was inserted: "                                  .$self->counter_allele_inserts;
-    INFO "Count of existing genbank files for alleles: "                              .$self->counter_successful_genbank_checks;
-    INFO "Count of successful genbank file inserts for alleles: "                     .$self->counter_successful_genbank_file_inserts;
-    INFO "Count of successful genbank file updates for alleles: "                     .$self->counter_successful_genbank_file_updates;
+    INFO "Count of rows where (no Dre) Allele already in Tarnits: "                   .$self->counter_found_no_dre_alleles;
+    INFO "Count of rows where (no Dre) Allele not found in Tarmits: "                 .$self->counter_not_found_no_dre_alleles;
+    INFO "Count of rows where (no Dre) Allele was inserted: "                         .$self->counter_no_dre_allele_inserts;
+    INFO "Count of existing genbank files for (no Dre) alleles: "                     .$self->counter_successful_no_dre_genbank_checks;
+    INFO "Count of successful genbank file inserts for (no Dre) alleles: "            .$self->counter_successful_no_dre_genbank_file_inserts;
+    INFO "Count of successful genbank file updates for (no Dre) alleles: "            .$self->counter_successful_no_dre_genbank_file_updates;
     INFO "---";
-    INFO "Count of FAILED rows for Allele inserts: "                                  .$self->counter_failed_allele_inserts;
-    INFO "Count of FAILED genbank file checks for alleles: "                          .$self->counter_failed_genbank_checks;
-    INFO "Count of FAILED genbank file inserts for alleles: "                         .$self->counter_failed_genbank_file_inserts;
-    INFO "Count of FAILED genbank file updates for alleles: "                         .$self->counter_failed_genbank_file_updates;
+    INFO "Count of FAILED rows for (no Dre) Allele inserts: "                         .$self->counter_failed_no_dre_allele_inserts;
+    INFO "Count of FAILED genbank file checks for (no Dre) alleles: "                 .$self->counter_failed_no_dre_genbank_checks;
+    INFO "Count of FAILED genbank file inserts for (no Dre) alleles: "                .$self->counter_failed_no_dre_genbank_file_inserts;
+    INFO "Count of FAILED genbank file updates for (no Dre) alleles: "                .$self->counter_failed_no_dre_genbank_file_updates;
+    INFO "-------------------";
+    INFO "Count of rows where (with Dre) Allele already in Tarnits: "                 .$self->counter_found_dre_alleles;
+    INFO "Count of rows where (with Dre) Allele not found in Tarmits: "               .$self->counter_not_found_dre_alleles;
+    INFO "Count of rows where (with Dre) Allele was inserted: "                       .$self->counter_dre_allele_inserts;
+    INFO "Count of existing genbank files for (with Dre) alleles: "                   .$self->counter_successful_dre_genbank_checks;
+    INFO "Count of successful genbank file inserts for (with Dre) alleles: "          .$self->counter_successful_dre_genbank_file_inserts;
+    INFO "Count of successful genbank file updates for (with Dre) alleles: "          .$self->counter_successful_dre_genbank_file_updates;
+    INFO "---";
+    INFO "Count of FAILED rows for (with Dre) Allele inserts: "                       .$self->counter_failed_dre_allele_inserts;
+    INFO "Count of FAILED genbank file checks for (with Dre) alleles: "               .$self->counter_failed_dre_genbank_checks;
+    INFO "Count of FAILED genbank file inserts for (with Dre) alleles: "              .$self->counter_failed_dre_genbank_file_inserts;
+    INFO "Count of FAILED genbank file updates for (with Dre) alleles: "              .$self->counter_failed_dre_genbank_file_updates;
     INFO "-------------------";
     # counters from tarmits updates/inserts for targeting vectors
     INFO "Count of rows where Targeting vector already in Tarnits: "                  .$self->counter_found_tvs;
@@ -293,11 +359,13 @@ sub check_clones_against_tarmits {
     INFO "Count of rows where ES Cell report to public flag was updated to FALSE: "   .$self->counter_es_cell_rtp_updates_to_false;
     INFO "Count of rows where ES Cell ikmc project ID was updated: "                  .$self->counter_es_cell_ikmc_proj_id_updates;
     INFO "Count of rows where ES Cell allele symbol superscript flag was updated: "   .$self->counter_es_cell_asym_updates;
+    INFO "Count of rows where ES Cell allele ID was updated: "                        .$self->counter_es_cell_allele_id_updates;
     INFO "Count of IGNORED rows for ES Cells: "                                       .$self->counter_ignored_es_cells;
     INFO "---";
     INFO "Count of FAILED rows for ES Cell report to public flag updates: "           .$self->counter_failed_es_cell_rtp_updates;
     INFO "Count of FAILED rows for ES Cell ikmc project ID updates: "                 .$self->counter_failed_es_cell_ikmc_proj_id_updates;
     INFO "Count of FAILED rows for ES Cell allele symbol superscript flag updates: "  .$self->counter_failed_es_cell_asym_updates;
+    INFO "Count of FAILED rows for ES Cell allele ID updates: "                       .$self->counter_failed_es_cell_allele_id_updates;
     INFO "-------------- Tarmits update End ---------------";
 
     return;
@@ -306,7 +374,7 @@ sub check_clones_against_tarmits {
 sub _check_gene_against_tarmits {
     my ( $self ) = @_;
 
-    TRACE "Checking gene MGI ID: ".$self->curr_gene_mgi_id;
+    DEBUG "Checking gene MGI ID: ".$self->curr_gene_mgi_id;
 
     for my $design_id ( sort keys %{ $self->es_clones->{ $self->curr_gene_mgi_id }->{ 'designs' } } ) {
         $self->curr_design_id ( $design_id );
@@ -323,47 +391,25 @@ sub _check_gene_against_tarmits {
 sub _check_allele_against_tarmits {
     my ( $self ) = @_;
 
-    TRACE "Design = ".$self->curr_design_id.":";
+    DEBUG "Design = ".$self->curr_design_id.":";
 
-    $self->curr_design ( $self->es_clones->{ $self->curr_gene_mgi_id }->{ 'designs' }->{ $self->curr_design_id } );
+    $self->curr_design( $self->es_clones->{ $self->curr_gene_mgi_id }->{ 'designs' }->{ $self->curr_design_id } );
 
-    my $find_allele_results = $self->_check_for_existing_allele();
-
-    # initialise fields
-    $self->curr_allele_id ( undef );
-    $self->curr_allele_genbank_exists ( 0 );
-    $self->curr_allele_genbank_db_id ( undef );
-    $self->curr_allele_genbank_updated( 0 );
-
-    if ( defined $find_allele_results && scalar @{ $find_allele_results } > 0 ) {
-
-        # allele already exists in Tarmits
-        $self->inc_counter_found_alleles;
-
-        # fetch allele id for use when looking at targeting vectors
-        $self->curr_allele_id ( $find_allele_results->[0]->{ 'id' } );
-
-        DEBUG "Found allele match, allele ID: ".$self->curr_allele_id;
-
-        # check whether the genbank files are in tarmits
-        $self->_check_genbank_files();
-    }
-    else
-    {
-        # did not find allele in Tarmits, insert it
-        $self->inc_counter_not_found_alleles;
-
-        $self->_insert_allele ();
-
-        DEBUG "Allele ID after insert: ".$self->curr_allele_id;
-    }
-
-    unless ( defined $self->curr_allele_id ) {
-        # do not continue down to targeting vectors for this allele
+    unless ( defined $self->curr_design && defined $self->curr_design->{ 'design_details' } ) {
+        ERROR "Failed to get design details, cannot continue to check alleles for gene ID: ".$self->curr_gene_mgi_id;
         return;
     }
 
-    INFO "Processing targeting vectors in Allele ID: ".$self->curr_allele_id;
+    $self->_check_for_existing_no_dre_allele();
+    $self->_check_for_existing_dre_allele();
+
+    unless ( defined $self->curr_allele_no_dre_id && defined $self->curr_allele_dre_id ) {
+        ERROR "Failed to get alleles, cannot continue down to targeting vectors for gene ID: ".$self->curr_gene_mgi_id;
+        return;
+    }
+
+    INFO $self->curr_gene_mgi_id.": No Dre Allele ID: ".$self->curr_allele_no_dre_id;
+    INFO $self->curr_gene_mgi_id.": Dre Allele ID: ".$self->curr_allele_dre_id;
 
     # Cycle through the targeting vectors in the allele
     for my $targeting_vector_name ( sort keys %{ $self->es_clones->{ $self->curr_gene_mgi_id }->{ 'designs' }->{ $self->curr_design_id }->{ 'targeting_vectors' } } ) {
@@ -380,98 +426,236 @@ sub _check_allele_against_tarmits {
     return;
 }
 
-sub _check_for_existing_allele {
+sub _check_for_existing_no_dre_allele {
     my ( $self ) = @_;
 
+    # initialise fields
+    $self->curr_allele_no_dre_id ( undef );
+    $self->curr_allele_no_dre_genbank_exists ( 0 );
+    $self->curr_allele_no_dre_genbank_db_id ( undef );
+    $self->curr_allele_no_dre_genbank_updated( 0 );
+
+    my $cassette = $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' };
+
+    my $find_no_dre_allele_results = $self->_check_for_existing_allele( $cassette );
+
+    if ( defined $find_no_dre_allele_results && scalar @{ $find_no_dre_allele_results } > 0 ) {
+
+        # allele already exists in Tarmits
+        $self->inc_counter_found_no_dre_alleles;
+
+        # fetch allele id for use when looking at targeting vectors
+        $self->curr_allele_no_dre_id ( $find_no_dre_allele_results->[0]->{ 'id' } );
+
+        DEBUG "Found existing no dre allele match, allele ID: ".$self->curr_allele_no_dre_id;
+
+        # check whether the genbank files are in tarmits
+        $self->_check_no_dre_genbank_files();
+    }
+    else
+    {
+        # did not find allele in Tarmits, insert it
+        $self->inc_counter_not_found_no_dre_alleles;
+
+        $self->_insert_no_dre_allele ();
+
+        if( defined $self->curr_allele_no_dre_id ) {
+            DEBUG "The no dre allele ID after insert: ".$self->curr_allele_no_dre_id;
+        }
+        else {
+            ERROR "FAILED to get no dre allele ID after insert";
+        }
+    }
+
+    return;
+}
+
+sub _check_for_existing_dre_allele {
+    my ( $self ) = @_;
+
+    # initialise fields
+    $self->curr_allele_dre_id ( undef );
+    $self->curr_allele_dre_genbank_exists ( 0 );
+    $self->curr_allele_dre_genbank_db_id ( undef );
+    $self->curr_allele_dre_genbank_updated( 0 );
+
+    # add cassette suffix
+    my $cassette = $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' };
+    $cassette = $cassette.'_dre';
+
+    my $find_dre_allele_results = $self->_check_for_existing_allele( $cassette );
+
+    if ( defined $find_dre_allele_results && scalar @{ $find_dre_allele_results } > 0 ) {
+
+        # allele already exists in Tarmits
+        $self->inc_counter_found_dre_alleles;
+
+        # fetch allele id for use when looking at targeting vectors
+        $self->curr_allele_dre_id ( $find_dre_allele_results->[0]->{ 'id' } );
+
+        DEBUG "Found existing dre allele match, allele ID: ".$self->curr_allele_dre_id;
+
+        # check whether the genbank files are in tarmits
+        $self->_check_dre_genbank_files();
+    }
+    else
+    {
+        # did not find allele in Tarmits, insert it
+        $self->inc_counter_not_found_dre_alleles;
+
+        $self->_insert_dre_allele();
+
+        if( defined $self->curr_allele_dre_id ) {
+            DEBUG "The dre allele ID after insert: ".$self->curr_allele_dre_id;
+        }
+        else {
+            ERROR "FAILED to get dre allele ID after insert";
+        }
+    }
+    return;
+}
+
+sub _check_for_existing_allele {
+    my ( $self, $cassette ) = @_;
+
     # Create selection criteria hash to be used to determine if the allele already exists in Tarmits
-    my %find_allele_params = (
+    my $find_allele_params = {
         'project_design_id_eq'     => $self->curr_design_id,
         'gene_mgi_accession_id_eq' => $self->curr_gene_mgi_id,
         'assembly_eq'              => $self->curr_design->{ 'design_details' }->{ 'genomic_position' }->{ 'assembly' },
         'chromosome_eq'            => $self->curr_design->{ 'design_details' }->{ 'genomic_position' }->{ 'chromosome' },
         'strand_eq'                => $self->curr_design->{ 'design_details' }->{ 'genomic_position' }->{ 'strand' },
-        'cassette_eq'              => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' },
+        'cassette_eq'              => $cassette,
         'backbone_eq'              => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'backbone' },
         'homology_arm_start_eq'    => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'homology_arm' }->{ 'start' },
         'homology_arm_end_eq'      => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'homology_arm' }->{ 'end' },
         'cassette_start_eq'        => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'cassette' }->{ 'start' },
         'cassette_end_eq'          => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'cassette' }->{ 'end' },
-    );
+    };
 
     if ( defined $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'start' } ) {
-        $find_allele_params{ 'loxp_start_eq' } = $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'start' };
+        $find_allele_params->{ 'loxp_start_eq' } = $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'start' };
     }
     if ( defined $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'end' } ) {
-        $find_allele_params{ 'loxp_end_eq' } = $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'end' };
+        $find_allele_params->{ 'loxp_end_eq' } = $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'end' };
     }
 
     # access Tarmits to see if we can locate the allele
-    my $find_allele_results = $self->tm->find_allele( \%find_allele_params );
+    my $find_allele_results = $self->tm->find_allele( $find_allele_params );
 
     return $find_allele_results;
 }
 
-sub _insert_allele {
+sub _insert_no_dre_allele {
     my ( $self ) = @_;
 
-    DEBUG "No allele match, inserting";
+    my $cassette = $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' };
 
-    my %insert_allele_params = (
-        'project_design_id'        => $self->curr_design_id,
-        'gene_mgi_accession_id'    => $self->curr_gene_mgi_id,
-        'assembly'                 => $self->design->{ 'design_details' }->{ 'genomic_position' }->{ 'assembly' },
-        'chromosome'               => $self->design->{ 'design_details' }->{ 'genomic_position' }->{ 'chromosome' },
-        'strand'                   => $self->design->{ 'design_details' }->{ 'genomic_position' }->{ 'strand' },
-        'cassette'                 => $self->design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' },
-        'backbone'                 => $self->design->{ 'design_details' }->{ 'mutation_details' }->{ 'backbone' },
-        'homology_arm_start'       => $self->design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'homology_arm' }->{ 'start' },
-        'homology_arm_end'         => $self->design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'homology_arm' }->{ 'end' },
-        'cassette_start'           => $self->design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'cassette' }->{ 'start' },
-        'cassette_end'             => $self->design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'cassette' }->{ 'end' },
-        'cassette_type'            => $self->design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette_type' },
-        'mutation_type_name'       => $self->design->{ 'design_details' }->{ 'mutation_details' }->{ 'mutation_type' },
-        # leave mutation subtype blank
-        #'mutation_subtype_name'    => $self->design->{ 'design_details' }->{ 'mutation_details' }->{ 'mutation_subtype' },
-        'mutation_method_name'     => $self->design->{ 'design_details' }->{ 'mutation_details' }->{ 'mutation_method' },
-        'floxed_start_exon'        => $self->design->{ 'design_details' }->{ 'mutation_details' }->{ 'floxed_start_exon' },
-        'floxed_end_exon'          => $self->design->{ 'design_details' }->{ 'mutation_details' }->{ 'floxed_end_exon' },
-    );
-
-    if ( defined $self->design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'start' } ) {
-        $insert_allele_params{ 'loxp_start' } = $self->design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'start' };
-    }
-    if ( defined $self->design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'end' } ) {
-        $insert_allele_params{ 'loxp_end' } = $self->design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'end' };
-    }
+    my $insert_allele_params = $self->_generate_insert_allele_params( $cassette );
 
     try {
-        my $insert_allele_results = $self->tm->create_allele( \%insert_allele_params );
+        my $insert_allele_results = $self->tm->create_allele( $insert_allele_params );
 
         if ( $insert_allele_results->{ 'project_design_id' } == $self->curr_design_id ) {
 
-            $self->inc_counter_allele_inserts;
+            $self->inc_counter_no_dre_allele_inserts;
 
             # store allele id for use for targeting vector inserts
-            $self->curr_allele_id ( $insert_allele_results->{ 'id' } );
+            $self->curr_allele_no_dre_id ( $insert_allele_results->{ 'id' } );
 
-            INFO "Inserted allele ID: ".$self->curr_allele_id." successfully, continuing.";
+            INFO "Inserted no dre allele ID: ".$self->curr_allele_no_dre_id." successfully, continuing.";
         }
         else {
-            WARN "Check on inserted Allele failed for gene: ".$self->curr_gene_mgi_id." design id:".$self->curr_design_id;
+            WARN "Check on inserted no dre allele failed for gene: ".$self->curr_gene_mgi_id." design id:".$self->curr_design_id;
 
             # increment counter
-            $self->inc_counter_failed_allele_inserts;
+            $self->inc_counter_failed_no_dre_allele_inserts;
         }
 
     } catch {
-        ERROR "FAILED Allele insert for gene: ".$self->curr_gene_mgi_id." design id: ". $self->curr_design_id;
-        TRACE "Exception: ".$_;
+        ERROR "FAILED no dre allele insert for gene: ".$self->curr_gene_mgi_id." design id: ". $self->curr_design_id;
+        ERROR "Exception: ".$_;
 
         # increment counter
-        $self->inc_counter_failed_allele_inserts;
+        $self->inc_counter_failed_no_dre_allele_inserts;
     };
 
     return;
+}
+
+sub _insert_dre_allele {
+    my ( $self ) = @_;
+
+    my $cassette = $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' };
+    $cassette = $cassette.'_dre';
+
+    my $insert_allele_params = $self->_generate_insert_allele_params( $cassette );
+
+    try {
+        my $insert_allele_results = $self->tm->create_allele( $insert_allele_params );
+
+        if ( $insert_allele_results->{ 'project_design_id' } == $self->curr_design_id ) {
+
+            $self->inc_counter_dre_allele_inserts;
+
+            # store allele id for use for targeting vector inserts
+            $self->curr_allele_dre_id ( $insert_allele_results->{ 'id' } );
+
+            INFO "Inserted dre allele ID: ".$self->curr_allele_dre_id." successfully, continuing.";
+        }
+        else {
+            WARN "Check on inserted dre allele failed for gene: ".$self->curr_gene_mgi_id." design id:".$self->curr_design_id;
+
+            # increment counter
+            $self->inc_counter_failed_dre_allele_inserts;
+        }
+
+    } catch {
+        ERROR "FAILED dre allele insert for gene: ".$self->curr_gene_mgi_id." design id: ". $self->curr_design_id;
+        ERROR "Exception: ".$_;
+
+        # increment counter
+        $self->inc_counter_failed_dre_allele_inserts;
+    };
+
+    return;
+}
+
+sub _generate_insert_allele_params {
+    my ( $self, $cassette ) = @_;
+
+    DEBUG "Inserting allele";
+
+    my $insert_allele_params = {
+        'project_design_id'        => $self->curr_design_id,
+        'gene_mgi_accession_id'    => $self->curr_gene_mgi_id,
+        'assembly'                 => $self->curr_design->{ 'design_details' }->{ 'genomic_position' }->{ 'assembly' },
+        'chromosome'               => $self->curr_design->{ 'design_details' }->{ 'genomic_position' }->{ 'chromosome' },
+        'strand'                   => $self->curr_design->{ 'design_details' }->{ 'genomic_position' }->{ 'strand' },
+        'cassette'                 => $cassette,
+        'backbone'                 => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'backbone' },
+        'homology_arm_start'       => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'homology_arm' }->{ 'start' },
+        'homology_arm_end'         => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'homology_arm' }->{ 'end' },
+        'cassette_start'           => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'cassette' }->{ 'start' },
+        'cassette_end'             => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'cassette' }->{ 'end' },
+        'cassette_type'            => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette_type' },
+        'mutation_type_name'       => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'mutation_type' },
+        'mutation_method_name'     => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'mutation_method' },
+        'floxed_start_exon'        => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'floxed_start_exon' },
+        'floxed_end_exon'          => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'floxed_end_exon' },
+    };
+
+    # leave mutation subtype blank
+    #'mutation_subtype_name'    => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'mutation_subtype' },
+
+    if ( defined $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'start' } ) {
+        $insert_allele_params->{ 'loxp_start' } = $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'start' };
+    }
+    if ( defined $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'end' } ) {
+        $insert_allele_params->{ 'loxp_end' } = $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'loxp' }->{ 'end' };
+    }
+
+    return $insert_allele_params;
 }
 
 sub _check_targeting_vector_against_tarmits {
@@ -482,15 +666,15 @@ sub _check_targeting_vector_against_tarmits {
     $self->curr_targeting_vector ( $self->es_clones->{ $self->curr_gene_mgi_id }->{ 'designs' }->{ $self->curr_design_id }->{ 'targeting_vectors' }->{ $self->curr_targeting_vector_name } );
 
     # List of unique targeting vector features
-    my %find_tv_params = (
+    my $find_tv_params = {
         'name_eq' => $self->curr_targeting_vector_name,
-    );
+    };
 
     # return type should be an array of hashes
-    my $tv_find_results = $self->tm->find_targeting_vector( \%find_tv_params );
+    my $tv_find_results = $self->tm->find_targeting_vector( $find_tv_params );
 
     # targeting vector id needed for es cell clone checks
-    $self->curr_targeting_vector_id ( 0 );
+    $self->curr_targeting_vector_id ( undef );
 
     if ( defined $tv_find_results && scalar @{ $tv_find_results } > 0 ) {
 
@@ -506,11 +690,12 @@ sub _check_targeting_vector_against_tarmits {
         # targeting vector already exists in Tarmits
         $self->inc_counter_found_tvs;
 
-        DEBUG "Found targeting vector match, ID: ".$self->curr_targeting_vector_id." checking project id and report to public flag";
+        DEBUG "Found targeting vector match, ID: ".$self->curr_targeting_vector_id;
 
-        # if force updates is on, update the ikmc project ID for this targeting vector
-        # TODO: update ikmc project id
+        # if force updates is on
         if ( $self->force_updates ) {
+
+            # update the ikmc project ID for this targeting vector
             if (!$self->_update_targ_vect_ikmc_project_id() ) {
                 ERROR "Failed to update targeting vector ikmc project id for vector name: ".$self->curr_targeting_vector_name;
             }
@@ -544,9 +729,10 @@ sub _check_targeting_vector_against_tarmits {
         $self->curr_clone_name ( $curr_clone_name );
 
         # initialise fields
-        $self->curr_es_cell_clone_id ( undef );
-        $self->curr_clone ( undef );
-        $self->curr_clone_accepted ( 0 );
+        $self->curr_es_cell_clone_id( undef );
+        $self->curr_clone( undef );
+        $self->curr_clone_accepted( 0 );
+        $self->curr_clone_has_dre( 0 );
 
         # check each es cell clone
         $self->_check_es_cell_against_tarmits();
@@ -563,12 +749,12 @@ sub _update_targ_vect_ikmc_project_id {
     my $ikmc_project_id = $self->_select_or_create_ikmc_project_id;
 
     try {
-        my %update_ikmc_proj_id_params = (
+        my $update_ikmc_proj_id_params = {
             'ikmc_project_id' => $ikmc_project_id,
-        );
+        };
 
         # update takes the id of the item plus the updated parameters
-        my $tv_update_results = $self->tm->update_targeting_vector( $self->curr_targeting_vector_id, \%update_ikmc_proj_id_params );
+        my $tv_update_results = $self->tm->update_targeting_vector( $self->curr_targeting_vector_id, $update_ikmc_proj_id_params );
 
         if ( defined $tv_update_results && ( $tv_update_results->{ 'id' } == $self->curr_targeting_vector_id ) ) {
             $self->inc_counter_tv_ikmc_proj_id_updates;
@@ -602,12 +788,12 @@ sub _update_targ_vect_report_to_public_flag {
     DEBUG "Targeting Vector report to public is currently false, need to update it to true";
 
     try {
-        my %update_tv_params = (
+        my $update_tv_params = {
             'report_to_public' => $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'report_to_public' },
-        );
+        };
 
         # update takes the id of the item plus the updated parameters
-        my $tv_update_results = $self->tm->update_targeting_vector( $self->curr_targeting_vector_id, \%update_tv_params );
+        my $tv_update_results = $self->tm->update_targeting_vector( $self->curr_targeting_vector_id, $update_tv_params );
 
         if ( defined $tv_update_results && ( $tv_update_results->{ 'id' } == $self->curr_targeting_vector_id ) ) {
             $self->inc_counter_tv_rtp_updates;
@@ -626,7 +812,7 @@ sub _update_targ_vect_report_to_public_flag {
         $self->inc_counter_failed_tv_rtp_updates;
 
         ERROR "FAILED Targeting vector report to public update for gene ID: ".$self->curr_gene_mgi_id.", design: ".$self->curr_design_id.", targeting vector: ".$self->curr_targeting_vector_name;
-        TRACE "Exception: ".$_;
+        ERROR "Exception: ".$_;
     };
 
     return $update_ok;
@@ -638,40 +824,34 @@ sub _insert_targeting_vector {
     DEBUG "No targeting vector match, inserting new one";
 
     # set up targeting vector insert parameters
-    my %insert_tv_params = (
+    # insert targeting vector against no-dre allele
+    my $insert_tv_params = {
         'name'                  => $self->curr_targeting_vector_name,
-        'allele_id'             => $self->curr_allele_id,
-        'ikmc_project_id'       => $self->_select_or_create_ikmc_project_id (),
+        'allele_id'             => $self->curr_allele_no_dre_id,
+        'ikmc_project_id'       => $self->_select_or_create_ikmc_project_id(),
         'intermediate_vector'   => $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'intermediate_vector' },
         'pipeline_id'           => $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'pipeline_id' },
         'report_to_public'      => $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'report_to_public' },
-    );
+    };
 
     try {
-        my $results_tv_insert = $self->tm->create_targeting_vector( \%insert_tv_params );
+        my $results_tv_insert = $self->tm->create_targeting_vector( $insert_tv_params );
 
         if ( defined $results_tv_insert && ( $results_tv_insert->{ 'name' } eq $self->curr_targeting_vector_name ) ) {
-
             $self->inc_counter_tv_inserts;
 
             # store targeting vector id for use for es cell clone checks
             $self->curr_targeting_vector_id ( $results_tv_insert->{ 'id' } );
-
             INFO "Inserted targeting vector ID: ".$self->curr_targeting_vector_id." successfully";
-
         }
         else {
-
             WARN "Check on inserted targeting vector failed for gene: ".$self->curr_gene_mgi_id.", design: ".$self->curr_design_id.", targeting vector: ".$self->curr_targeting_vector_name;
-
-            # increment counter
             $self->inc_counter_failed_tv_inserts;
         }
-
     }
     catch {
         ERROR "FAILED Targeting vector insert for gene: ".$self->curr_gene_mgi_id.", design: ".$self->curr_design_id.", targeting vector: ".$self->curr_targeting_vector_name;
-        TRACE "Exception: ".$_;
+        ERROR "Exception: ".$_;
 
         # increment counter
         $self->inc_counter_failed_tv_inserts;
@@ -689,56 +869,91 @@ sub _select_or_create_ikmc_project_id {
     # a legacy project id may already exist
     $ikmc_proj_id = $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'ikmc_project_id' };
 
-    # if no legacy project id found, create a new one
+    # if no legacy project id found, create a new one, ( N.B. always use the no dre allele ID )
     unless ( defined $ikmc_proj_id && $ikmc_proj_id ne '' ) {
-        $ikmc_proj_id = ( $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'pipeline_name' } ).'_'.$self->curr_allele_id;
+        $ikmc_proj_id = ( $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'pipeline_name' } ).'_'.$self->curr_allele_no_dre_id;
     }
 
-    DEBUG "select or create, ikmc_proj_id set to: ".$ikmc_proj_id;
+    DEBUG "Select or create, ikmc_proj_id set to: ".$ikmc_proj_id;
 
     return $ikmc_proj_id;
 }
 
+## no critic ( Subroutines::ProhibitExcessComplexity )
 sub _check_es_cell_against_tarmits {
     my ( $self ) = @_;
 
-    DEBUG "Check ES cells - Clone name: ".$self->curr_clone_name;
+    DEBUG "Checking ES cell, clone name: ".$self->curr_clone_name;
 
     $self->curr_clone ( $self->es_clones->{ $self->curr_gene_mgi_id }->{ 'designs' }->{ $self->curr_design_id }->{ 'targeting_vectors' }->{ $self->curr_targeting_vector_name }->{ 'clones' }->{ $self->curr_clone_name } );
     $self->curr_clone_accepted ( $self->curr_clone->{ 'info' }->{ 'clone_accepted' } );
 
+    my $ep_recomb = $self->curr_clone->{ 'es_cell_details' }->{ 'ep_recombinase' };
+    if ( defined $ep_recomb && $ep_recomb eq 'Dre' ) {
+        DEBUG "Current clone has Dre";
+        $self->curr_clone_has_dre ( 1 );
+    }
+    else {
+        DEBUG "Current clone does not have Dre";
+    }
+
     # List of unique clone parameters for select
-    my %find_clone_params = (
+    my $find_clone_params = {
         'name_eq' => $self->curr_clone_name,
-    );
+    };
+
+    DEBUG "Check if the clone already exists";
 
     # return type should be an array of hashes
-    my $clone_find_results = $self->tm->find_es_cell( \%find_clone_params );
+    my $clone_find_results = $self->tm->find_es_cell( $find_clone_params );
 
     if ( defined $clone_find_results && scalar @{ $clone_find_results } > 0 ) {
+        DEBUG "Clone exists in Tarmits";
 
         # es cell clone already exists in Tarmits
         $self->inc_counter_found_es_cells;
 
         # fetch es cell clone id
         $self->curr_es_cell_clone_id ( $clone_find_results->[0]->{ 'id' } );
+        my $curr_allele_id = $clone_find_results->[0]->{ 'allele_id' };
 
-        DEBUG "Found ES cell clone match, ID: ".$self->curr_es_cell_clone_id.", now checking report to public flag";
+        if ( defined  $self->curr_es_cell_clone_id ) {
+            DEBUG "Found ES cell clone match, ID: ".$self->curr_es_cell_clone_id;
+        }
 
-        # if force updates is on, update the ikmc project ID for this es cell clone
-        # TODO: update ikmc project id
+        # if force updates is on
         if ( $self->force_updates ) {
+            DEBUG "Force updates is on, updating ikmc project ID";
+
+            # update the ikmc project ID for this es cell clone
             if (!$self->_update_clone_ikmc_project_id() ) {
                 ERROR "Failed to update es cell clone ikmc project id for clone name: ".$self->curr_clone_name;
+            }
+
+            DEBUG "Force updates: checking whether need to update allele ID";
+
+            # check the clone is linked to the correct allele ID: if clone is Dre'd but attached to no-Dre allele update it
+            if ( $self->curr_clone_has_dre && ( $curr_allele_id eq $self->curr_allele_no_dre_id ) ) {
+                DEBUG "Identified need to update allele ID from ".$curr_allele_id." to ".$self->curr_allele_no_dre_id;
+
+                # need to update clone allele ID as pointing at the wrong allele
+                if( !$self->_update_clone_allele_id() ) {
+                    ERROR "Failed to update es cell clone allele id for clone name: ".$self->curr_clone_name;
+                }
+                else {
+                    DEBUG "Updated allele ID successfully";
+                }
             }
         }
 
         # if report to public flag matches clone accepted flag do nothing, but if different then update
+        DEBUG "Checking report to public flag";
+
         my $tarmits_clone_report_to_public_string = $clone_find_results->[0]->{ 'report_to_public' };
         my $tarmits_clone_report_to_public = 0;
         if ( $tarmits_clone_report_to_public_string eq 'true' ) { $tarmits_clone_report_to_public = 1; }
 
-        TRACE "Tarmits clone report to public is currently: ".$tarmits_clone_report_to_public;
+        DEBUG "Tarmits clone report to public is currently: ".$tarmits_clone_report_to_public;
 
         if ( $tarmits_clone_report_to_public != $self->curr_clone_accepted ) {
             DEBUG "LIMS2 clone accepted flag ( ".$self->curr_clone_accepted." ) not equal to Tarmits report to public flag ( ".$tarmits_clone_report_to_public."), updating Tarmits";
@@ -746,40 +961,46 @@ sub _check_es_cell_against_tarmits {
             $self->_update_clone_report_to_public_flag();
         }
         else {
-            DEBUG "ES Cells report to public flag already set to: ".$self->curr_clone_accepted.", continuing";
+            DEBUG "Did not need to update report to public flag";
         }
+
+        DEBUG "Check allele symbol superscript for gene";
 
         # check allele symbol superscript set for ES clone, if not set it
         if ( not defined ( $clone_find_results->[0]->{ 'allele_symbol_superscript' } ) ) {
+            DEBUG "Allele symbol superscript not set, updating";
             $self->_update_clone_allele_symbol();
         }
         else {
-            DEBUG "ES Cells allele symbol superscript already set, continuing";
+            DEBUG "ES Cells allele symbol superscript already set";
         }
     }
     else
     {
-        # did not find es cell clone in Tarmits, insert it but ONLY if accepted
+        DEBUG "Clone does not exist in Tarmits";
+
+        # did not find es cell clone in Tarmits, insert it but ONLY if accepted in LIMS2
         if ( $self->curr_clone_accepted ) {
+            DEBUG "Clone accepted in LIMS2 but not found in Tarmits, inserting";
             $self->inc_counter_not_found_es_cells;
             $self->_insert_clone ();
         }
         else {
-            DEBUG "Clone not accepted in LIMS2 and not in Tarnits: ignore";
+            DEBUG "Clone not accepted in LIMS2 and not in Tarnits: IGNORING";
             $self->inc_counter_ignored_es_cells;
+            return;
         }
     }
 
-    # check the genbank files exist for the allele, if not insert them now we have a current allele, 
+    # check the genbank files exist for the allele, if not insert them now we have a current alleles, 
     # targeting vector and es cell clone
-    # TODO: move this into separate method
-
     unless ( defined $self->curr_es_cell_clone_id ) { return; }
 
     $self->_insert_or_update_genbank_files ();
 
     return;
 }
+## use critic
 
 sub _update_clone_ikmc_project_id {
     my ( $self ) = @_;
@@ -789,12 +1010,12 @@ sub _update_clone_ikmc_project_id {
     my $ikmc_project_id = $self->_select_or_create_ikmc_project_id;
 
     try {
-        my %update_ikmc_proj_id_params = (
+        my $update_ikmc_proj_id_params = {
             'ikmc_project_id' => $ikmc_project_id,
-        );
+        };
 
         # update takes the id of the item plus the updated parameters
-        my $clone_update_resultset = $self->tm->update_es_cell( $self->curr_es_cell_clone_id, \%update_ikmc_proj_id_params );
+        my $clone_update_resultset = $self->tm->update_es_cell( $self->curr_es_cell_clone_id, $update_ikmc_proj_id_params );
 
         if ( defined $clone_update_resultset && ( $clone_update_resultset->{ 'id' } == $self->curr_es_cell_clone_id ) ) {
             $self->inc_counter_es_cell_ikmc_proj_id_updates;
@@ -825,12 +1046,12 @@ sub _update_clone_report_to_public_flag {
     DEBUG "ES Cell clone report to public flag does not match state in LIMS2, attempting to update";
 
     try {
-        my %update_es_cell_params = (
+        my $update_es_cell_params = {
             'report_to_public' => $self->curr_clone_accepted,
-        );
+        };
 
         # update takes the id of the item plus the updated parameters
-        my $clone_update_resultset = $self->tm->update_es_cell( $self->curr_es_cell_clone_id, \%update_es_cell_params );
+        my $clone_update_resultset = $self->tm->update_es_cell( $self->curr_es_cell_clone_id, $update_es_cell_params );
 
         if ( defined $clone_update_resultset && ( $clone_update_resultset->{ 'id' } == $self->curr_es_cell_clone_id ) ) {
             if ( $self->curr_clone_accepted ) {
@@ -864,12 +1085,12 @@ sub _update_clone_allele_symbol {
     DEBUG "ES Cells allele symbol superscript empty, attempting to update";
 
     try {
-        my %update_es_cell_params = (
+        my $update_es_cell_params = {
             'allele_symbol_superscript' => $self->curr_clone->{ 'es_cell_details' }->{ 'allele_symbol_superscript' },
-        );
+        };
 
         # update takes the id of the item plus the updated parameters
-        my $clone_update_resultset = $self->tm->update_es_cell( $self->curr_es_cell_clone_id, \%update_es_cell_params );
+        my $clone_update_resultset = $self->tm->update_es_cell( $self->curr_es_cell_clone_id, $update_es_cell_params );
 
         if ( defined $clone_update_resultset && $clone_update_resultset != 0 ) {
             $self->inc_counter_es_cell_asym_updates;
@@ -886,35 +1107,86 @@ sub _update_clone_allele_symbol {
         $self->inc_counter_failed_es_cell_asym_updates;
 
         ERROR "FAILED allele symbol superscript update for ES Cell clone for gene: ".$self->curr_gene_mgi_id.", design: ".$self->curr_design_id.", targeting vector: ".$self->curr_targeting_vector_name.", es cell clone name: ".$self->curr_clone_name;
-        TRACE "Exception: ".$_;
+        ERROR "Exception: ".$_;
     };
 
     return;
 }
 
+sub _update_clone_allele_id {
+    my ( $self ) = @_;
+
+    my $update_ok = 0;
+
+    # using this method because the clone has been incorrectly linked to the no dre allele ID when it should be linked to the Dre allele ID
+
+    try {
+        my $update_clone_params = {
+            'allele_id' => $self->curr_allele_dre_id,
+        };
+
+        # update takes the id of the item plus the updated parameters
+        my $clone_update_resultset = $self->tm->update_es_cell( $self->curr_allele_no_dre_id, $update_clone_params );
+
+        if ( defined $clone_update_resultset && ( $clone_update_resultset->{ 'id' } == $self->curr_es_cell_clone_id ) ) {
+            $self->inc_counter_es_cell_allele_id_updates;
+
+            INFO "Updated allele ID for ES cell clone ID: ".$self->curr_es_cell_clone_id." to value: ".$self->curr_allele_dre_id.", continuing";
+
+            $update_ok = 1;
+        }
+        else {
+            $self->inc_counter_failed_es_cell_allele_id_updates;
+
+            WARN "Check on update of allele ID for ES cell clone failed for gene: ".$self->curr_gene_mgi_id.", design: ".$self->curr_design_id.", targeting vector: ".$self->curr_targeting_vector_name.", es cell clone name: ".$self->curr_clone_name;
+        }
+    }
+    catch {
+        $self->inc_counter_failed_es_cell_allele_id_updates;
+
+        ERROR "FAILED to update allele ID for ES Cell clone for gene: ".$self->curr_gene_mgi_id.", design: ".$self->curr_design_id.", targeting vector: ".$self->curr_targeting_vector_name.", es cell clone name: ".$self->curr_clone_name;
+        ERROR "Exception: ".$_;
+    };
+
+    return $update_ok;
+}
+
 sub _insert_clone {
     my ( $self ) = @_;
 
-    DEBUG "Inserting new accepted es clone";
+    DEBUG "Inserting new es clone";
 
-    my %insert_es_cell_params = (
+    # allele id depends on whether dre or no-dre
+    my $allele_id;
+    if( $self->curr_clone_has_dre ) {
+        DEBUG "Clone has Dre applied";
+        $allele_id = $self->curr_allele_dre_id;
+    }
+    else {
+        DEBUG "Clone has not had Dre applied";
+        $allele_id = $self->curr_allele_no_dre_id;
+    }
+
+    DEBUG "Allele ID to insert: ".$allele_id;
+
+    my $insert_es_cell_params = {
         'name'                      => $self->curr_clone_name,
-        'allele_id'                 => $self->curr_allele_id,
+        'allele_id'                 => $allele_id,
         'ikmc_project_id'           => $self->_select_or_create_ikmc_project_id (),
         'targeting_vector_id'       => $self->curr_targeting_vector_id,
         'parental_cell_line'        => $self->curr_clone->{ 'es_cell_details' }->{ 'parental_cell_line' },
         'pipeline_id'               => $self->curr_clone->{ 'es_cell_details' }->{ 'pipeline_id' },
         'report_to_public'          => $self->curr_clone->{ 'info' }->{ 'clone_accepted' },
         'allele_symbol_superscript' => $self->curr_clone->{ 'es_cell_details' }->{ 'allele_symbol_superscript' },
+    };
         # 'production_qc_five_prime_screen'  => $self->curr_clone->{ 'qc_metrics' }->{ 'five_prime_screen' },
         # 'production_qc_three_prime_screen' => $self->curr_clone->{ 'qc_metrics' }->{ 'three_prime_screen' },
         # 'production_qc_loxp_screen'        => $self->curr_clone->{ 'qc_metrics' }->{ 'loxp_screen' },
         # 'production_qc_loss_of_allele'     => $self->curr_clone->{ 'qc_metrics' }->{ 'loss_of_allele' },
         # 'production_qc_vector_integrity'   => $self->curr_clone->{ 'qc_metrics' }->{ 'vector_integrity' },
-    );
 
     try {
-        my $results_es_cell_insert = $self->tm->create_es_cell( \%insert_es_cell_params );
+        my $results_es_cell_insert = $self->tm->create_es_cell( $insert_es_cell_params );
 
         if ( defined $results_es_cell_insert && ( $results_es_cell_insert->{ 'name' } eq $self->curr_clone_name ) ) {
 
@@ -923,7 +1195,7 @@ sub _insert_clone {
             # store es cell clone id
             $self->curr_es_cell_clone_id ( $results_es_cell_insert->{ 'id' } );
 
-            INFO "Inserted es cell clone ID: ".$self->curr_es_cell_clone_id." successfully, continuing";
+            INFO "Inserted es cell clone ID: ".$self->curr_es_cell_clone_id;
         }
         else {
 
@@ -944,51 +1216,95 @@ sub _insert_clone {
     return;
 }
 
-sub _check_genbank_files {
+sub _check_no_dre_genbank_files {
     my ( $self ) = @_;
 
-    DEBUG "Checking genbank files for allele ID: ".$self->curr_allele_id;
+    DEBUG "Checking genbank files for no dre allele ID: ".$self->curr_allele_no_dre_id;
 
     my $tarmits_obj;
     try {
-        my %find_allele_params = (
-            'allele_id' => $self->curr_allele_id,
-        );
+        my $find_allele_params = {
+            'allele_id' => $self->curr_allele_no_dre_id,
+        };
 
-        $tarmits_obj = $self->tm->find_genbank_file( \%find_allele_params );
+        $tarmits_obj = $self->tm->find_genbank_file( $find_allele_params );
 
         # check tarmits object contains valid genbank files
         if ( defined $tarmits_obj && scalar @{ $tarmits_obj } > 0 ) {
-            # if ok set flag for allele
-            DEBUG "Found genbank files, fetch values";
-
             # check allele ID
             my $tarmits_allele_id = @{ $tarmits_obj }[0]->{ 'allele_id' };
             DEBUG "Tarmits allele ID retrieved: ".$tarmits_allele_id;
 
             # if ok set flag for allele
-            if ( defined $tarmits_allele_id && $tarmits_allele_id eq $self->curr_allele_id ) {
+            if ( defined $tarmits_allele_id && ( $tarmits_allele_id eq $self->curr_allele_no_dre_id ) ) {
                 # store the database ID field for genbank updates
-                $self->curr_allele_genbank_db_id ( @{ $tarmits_obj }[0]->{ 'id' } );
+                $self->curr_allele_no_dre_genbank_db_id ( @{ $tarmits_obj }[0]->{ 'id' } );
 
-                DEBUG "Retrieved data matches on allele ID: ".$tarmits_allele_id;
-                $self->curr_allele_genbank_exists ( 1 );
+                DEBUG "Retrieved genbank data matches on allele ID: ".$tarmits_allele_id;
+                $self->curr_allele_no_dre_genbank_exists ( 1 );
             }
         }
         else {
             # allele genbank exists flag stays false, so genbank data will be inserted on first clone
-            DEBUG "Did not find genbank files";
+            DEBUG "Did not find genbank files for no dre allele ID: ".$self->curr_allele_no_dre_id;
         }
 
         # increment counter
-        $self->inc_counter_successful_genbank_checks;
+        $self->inc_counter_successful_no_dre_genbank_checks;
     }
     catch {
-        WARN "Error when trying to fetch allele genbank files for allele ID: ".$self->curr_allele_id;
+        WARN "Error when trying to fetch allele genbank files for no dre allele ID: ".$self->curr_allele_no_dre_id;
         WARN "Exception: ".$_;
 
         # increment counter
-        $self->inc_counter_failed_genbank_checks;
+        $self->inc_counter_failed_no_dre_genbank_checks;
+    };
+
+    return;
+}
+
+sub _check_dre_genbank_files {
+    my ( $self ) = @_;
+
+    DEBUG "Checking genbank files for dre allele ID: ".$self->curr_allele_dre_id;
+
+    my $tarmits_obj;
+    try {
+        my $find_allele_params = {
+            'allele_id' => $self->curr_allele_dre_id,
+        };
+
+        $tarmits_obj = $self->tm->find_genbank_file( $find_allele_params );
+
+        # check tarmits object contains valid genbank files
+        if ( defined $tarmits_obj && scalar @{ $tarmits_obj } > 0 ) {
+            # check allele ID
+            my $tarmits_allele_id = @{ $tarmits_obj }[0]->{ 'allele_id' };
+            DEBUG "Tarmits allele ID retrieved: ".$tarmits_allele_id;
+
+            # if ok set flag for allele
+            if ( defined $tarmits_allele_id && ( $tarmits_allele_id eq $self->curr_allele_dre_id ) ) {
+                # store the database ID field for genbank updates
+                $self->curr_allele_dre_genbank_db_id ( @{ $tarmits_obj }[0]->{ 'id' } );
+
+                DEBUG "Retrieved genbank data matches on allele ID: ".$tarmits_allele_id;
+                $self->curr_allele_dre_genbank_exists ( 1 );
+            }
+        }
+        else {
+            # allele genbank exists flag stays false, so genbank data will be inserted on first clone
+            DEBUG "Did not find genbank files for dre allele ID: ".$self->curr_allele_dre_id;
+        }
+
+        # increment counter
+        $self->inc_counter_successful_dre_genbank_checks;
+    }
+    catch {
+        WARN "Error when trying to fetch allele genbank files for dre allele ID: ".$self->curr_allele_dre_id;
+        WARN "Exception: ".$_;
+
+        # increment counter
+        $self->inc_counter_failed_dre_genbank_checks;
     };
 
     return;
@@ -997,142 +1313,193 @@ sub _check_genbank_files {
 sub _insert_or_update_genbank_files {
     my ( $self ) = @_;
 
-    if ( $self->force_updates ) {
-        # do not update allele genbank files if already done for this allele
-        if  ( $self->curr_allele_genbank_updated ) { return; }
+    # only process based on current clone
+    if ( $self->curr_clone_has_dre ) {
+        if  ( $self->curr_allele_dre_genbank_updated ) { return; }
 
-        if ( $self->curr_allele_genbank_exists && defined $self->curr_allele_genbank_db_id ) {
-            DEBUG "Attempting to force update genbank files";
-            $self->_update_genbank_files;
+        unless ( defined $self->curr_allele_dre_id ) {
+            ERROR "Attempt to create genbank files but missing dre allele ID";
+            return;
+        }
+
+        if ( $self->curr_allele_dre_genbank_exists && defined $self->curr_allele_dre_genbank_db_id ) {
+            if ( $self->force_updates ) {
+                DEBUG "Force updates: update genbank data dre clone";
+
+                # create appropriate genbank files
+                my $genbank_files = $self->_create_genbank_files( $self->curr_allele_dre_id );
+
+                # update the allele genbank data
+                my $dre_db_id = $self->curr_allele_dre_genbank_db_id;
+                DEBUG "Existing genbank data database ID: ".$dre_db_id;
+                $self->_update_genbank_files( $dre_db_id, $genbank_files );
+
+                # set flag so only update once per allele
+                $self->curr_allele_dre_genbank_updated ( 1 );
+                DEBUG "Genbank data updated";
+            }
+            else {
+                # do nothing
+                return;
+            }
         }
         else {
-            DEBUG "Attempting to insert genbank files";
-            $self->_insert_genbank_files;
+            DEBUG "Insert genbank files dre clone";
+
+            # create appropriate genbank files
+            my $genbank_files = $self->_create_genbank_files( $self->curr_allele_dre_id );
+
+            # insert the allele genbank data
+            $self->_insert_genbank_files( $genbank_files );
+
+            # set flag so only update once per allele
+            $self->curr_allele_dre_genbank_updated ( 1 );
+            DEBUG "Genbank data inserted";
         }
-        # set flag so only update once per allele
-        $self->curr_allele_genbank_updated ( 1 );
     }
     else {
-        if ( !$self->curr_allele_genbank_exists ) {
-            DEBUG "Attempting to insert genbank files";
-            $self->_insert_genbank_files;
+        if  ( $self->curr_allele_no_dre_genbank_updated ) { return; }
+
+        unless ( defined $self->curr_allele_no_dre_id ) {
+            ERROR "Attempt to create genbank files but missing no dre allele ID";
+            return;
+        }
+
+        if ( $self->curr_allele_no_dre_genbank_exists && defined $self->curr_allele_no_dre_genbank_db_id ) {
+            if ( $self->force_updates ) {
+                DEBUG "Force updates: update genbank data no-dre clone";
+
+                # create appropriate genbank files
+                my $genbank_files = $self->_create_genbank_files( $self->curr_allele_no_dre_id );
+
+                # update the allele genbank data
+                my $no_dre_db_id = $self->curr_allele_no_dre_genbank_db_id;
+                DEBUG "Existing genbank data database ID: ".$no_dre_db_id;
+                $self->_update_genbank_files( $no_dre_db_id, $genbank_files );
+
+                # set flag so only update once per allele
+                $self->curr_allele_no_dre_genbank_updated ( 1 );
+            }
+            else {
+                # do nothing
+                return;
+            }
+        }
+        else {
+            # create appropriate genbank files
+            my $genbank_files = $self->_create_genbank_files( $self->curr_allele_no_dre_id );
+
+            # insert the allele genbank data
+            $self->_insert_genbank_files( $genbank_files );
+
+            # set flag so only update once per allele
+            $self->curr_allele_no_dre_genbank_updated ( 1 );
         }
     }
 
     return;
 }
 
-sub _insert_genbank_files {
-    my ( $self ) = @_;
+sub _create_genbank_files {
+    my ( $self, $allele_id ) = @_;
 
-    unless ( defined $self->curr_allele_id ) {
-        ERROR "Attempt to insert genbank files but missing allele ID";
-        return;
-    }
     unless ( defined $self->curr_es_cell_clone_id ) {
-        ERROR "Attempt to insert genbank files but missing clone ID";
+        ERROR "Attempt to update genbank files but missing clone ID";
         return;
     }
+
     unless ( defined $self->curr_targeting_vector_id ) {
-        ERROR "Attempt to insert genbank files but missing targeting vector ID";
+        ERROR "Attempt to update genbank files but missing targeting vector ID";
         return;
     }
 
-    DEBUG "Past validation checks in genbank insert method";
+    # create both bioseq strings
+    my $vect_bioseq_string = $self->_create_vector_bioseq_string();
+    my $escell_bioseq_string = $self->_create_allele_bioseq_string();
 
-    my $genbank_data = $self->_construct_genbank_data;
+    my $genbank_data = {};
+    # allele ID may be dre or non-dre version depending on clone
+    $genbank_data->{ 'allele_id' }          = $allele_id;
+    $genbank_data->{ 'targeting_vector' }   = $vect_bioseq_string;
+    $genbank_data->{ 'escell_clone' }       = $escell_bioseq_string;
 
-    unless ( $genbank_data ) {
-        ERROR "Error updating genbank data, failed to construct genbank data";
-        return;
-    }
+    return $genbank_data;
+}
+
+sub _insert_genbank_files {
+    my ( $self, $genbank_data ) = @_;
 
     my $tarmits_obj;
     try {
         $tarmits_obj = $self->tm->create_genbank_file( $genbank_data );
 
-        DEBUG "Inserted genbank files for allele ID: ".$self->curr_allele_id;
+        DEBUG "Inserted genbank files for allele ID: ".$genbank_data->{ 'allele_id' };
         # increment counter
-        $self->inc_counter_successful_genbank_file_inserts;
+        if( $self->curr_clone_has_dre ) {
+            $self->inc_counter_successful_dre_genbank_file_inserts;
+        }
+        else {
+            $self->inc_counter_successful_no_dre_genbank_file_inserts;
+        }
     }
     catch {
-        #TODO: msg and counter here
-        WARN "Unable to insert genbank files for allele ID: ".$self->curr_allele_id;
+        WARN "Unable to insert genbank files for allele ID: ".$genbank_data->{ 'allele_id' };
         WARN "Exception: ".$_;
-        $self->inc_counter_failed_genbank_file_inserts;
+
+        # increment counter
+        if( $self->curr_clone_has_dre ) {
+            $self->inc_counter_failed_dre_genbank_file_inserts;
+        }
+        else {
+            $self->inc_counter_failed_no_dre_genbank_file_inserts;
+        }
     };
 
     return;
 }
 
 sub _update_genbank_files {
-    my ( $self ) = @_;
-
-    unless ( defined $self->curr_allele_id ) {
-        ERROR "Attempt to update genbank files but missing allele ID";
-        return;
-    }
-    unless ( defined $self->curr_allele_genbank_db_id ) {
-        ERROR "Attempt to update genbank files but missing genbank DB ID";
-        return;
-    }
-    unless ( defined $self->curr_es_cell_clone_id ) {
-        ERROR "Attempt to update genbank files but missing clone ID";
-        return;
-    }
-    unless ( defined $self->curr_targeting_vector_id ) {
-        ERROR "Attempt to update genbank files but missing targeting vector ID";
-        return;
-    }
-
-    DEBUG "Past validation checks in genbank update method";
-
-    my $genbank_data = $self->_construct_genbank_data;
-
-    unless ( $genbank_data ) {
-        ERROR "Error updating genbank data, failed to construct genbank data";
-        return;
-    }
+    my ( $self, $db_id, $genbank_data ) = @_;
 
     my $tarmits_obj;
     try {
-        $tarmits_obj = $self->tm->update_genbank_file( $self->curr_allele_genbank_db_id, $genbank_data );
+        $tarmits_obj = $self->tm->update_genbank_file( $db_id, $genbank_data );
 
-        DEBUG "Updated genbank files for allele ID: ".$self->curr_allele_id." and database ID: ".$self->curr_allele_genbank_db_id;
+        DEBUG "Updated genbank files for allele ID: ".$genbank_data->{ 'allele_id' }." and database ID: ".$db_id;
 
         # increment counter
-        $self->inc_counter_successful_genbank_file_updates;
+        if( $self->curr_clone_has_dre ) {
+            $self->inc_counter_successful_dre_genbank_file_updates;
+        }
+        else {
+            $self->inc_counter_successful_no_dre_genbank_file_updates;
+        }
     }
     catch {
-        WARN "Unable to update genbank files for allele ID: ".$self->curr_allele_id;
+        WARN "Unable to update genbank files for allele ID: ".$genbank_data->{ 'allele_id' };
         WARN "Exception: ".$_;
-        $self->inc_counter_failed_genbank_file_updates;
+
+        # increment counter
+        if( $self->curr_clone_has_dre ) {
+            $self->inc_counter_failed_dre_genbank_file_updates;
+        }
+        else {
+            $self->inc_counter_failed_no_dre_genbank_file_updates;
+        }
     };
 
     return;
 }
 
-sub _construct_genbank_data {
+sub _create_allele_bioseq_string {
     my ( $self ) = @_;
 
-    my $vector_lims2_well_id = $self->curr_targeting_vector->{ 'info' }->{ 'targeting_vector_well_id' };
     my $es_cell_lims2_well_id = $self->curr_clone->{ 'info' }->{ 'clone_well_id' };
 
-    # validate we have both well ids required for genbank file creation
-    unless ( defined $vector_lims2_well_id && $vector_lims2_well_id > 0 ) {
-        ERROR "Error constructing genbank data, lims2 vector well id not set";
-        return;
-    }
     unless ( defined $es_cell_lims2_well_id && $es_cell_lims2_well_id > 0 ) {
         ERROR "Error constructing genbank data, lims2 es cell well id not set";
         return;
     }
-
-    # create vector genbank file as string
-    my ( $vect_method, $vect_output_well_id, $vect_params ) = generate_well_eng_seq_params( $self->model, { 'well_id' => $vector_lims2_well_id } );
-    my $vect_builder         = EngSeqBuilder->new;
-    my $vect_bioseq          = $vect_builder->$vect_method( %{ $vect_params });
-    my $vect_bioseq_string   = _stringify_bioseq( $vect_bioseq );
 
     # create es cell genbank file as string
     my ( $escell_method, $escell_output_well_id, $escell_params ) = generate_well_eng_seq_params( $self->model, { 'well_id' => $es_cell_lims2_well_id } );
@@ -1142,12 +1509,27 @@ sub _construct_genbank_data {
     # NB see EngSeqBuilder::SiteSpecificRecombination apply_dre( would send it the $escell_bioseq object and it would modify it );
     my $escell_bioseq_string = _stringify_bioseq( $escell_bioseq );
 
-    my $genbank_data = {};
-    $genbank_data->{ 'allele_id' }          = $self->curr_allele_id;
-    $genbank_data->{ 'targeting_vector' }   = $vect_bioseq_string;
-    $genbank_data->{ 'escell_clone' }       = $escell_bioseq_string;
+    return $escell_bioseq_string;
+}
 
-    return $genbank_data;
+sub _create_vector_bioseq_string {
+    my ( $self ) = @_;
+
+    my $vector_lims2_well_id = $self->curr_targeting_vector->{ 'info' }->{ 'targeting_vector_well_id' };
+
+    # validate we have both well ids required for genbank file creation
+    unless ( defined $vector_lims2_well_id && $vector_lims2_well_id > 0 ) {
+        ERROR "Error constructing genbank vector data, lims2 vector well id not set";
+        return;
+    }
+
+    # create vector genbank file as string
+    my ( $vect_method, $vect_output_well_id, $vect_params ) = generate_well_eng_seq_params( $self->model, { 'well_id' => $vector_lims2_well_id } );
+    my $vect_builder         = EngSeqBuilder->new;
+    my $vect_bioseq          = $vect_builder->$vect_method( %{ $vect_params });
+    my $vect_bioseq_string   = _stringify_bioseq( $vect_bioseq );
+
+    return $vect_bioseq_string;
 }
 
 sub _stringify_bioseq {
@@ -1191,6 +1573,8 @@ sub _refactor_selected_clones {
         # if current design id (allele) doesn't exist in hash then add it
         my $current_design_id = $result->{ 'design_id' };
 
+        my $design_exists = exists $results_refactored{ $current_gene_id }->{ 'designs' }->{ $current_design_id };
+
         unless ( exists $results_refactored{ $current_gene_id }->{ 'designs' }->{ $current_design_id } ) {
 
             #skip if already im error list
@@ -1205,9 +1589,8 @@ sub _refactor_selected_clones {
                 # fetch hashref of oligos from design info
                 my $design_oligos =$design_info->oligos;
 
-                # build design details hash
+                # build design details hash and add it into main hash
                 my $design_details = $self->_select_lims2_design_details ( $result, $design_info, $design_oligos );
-
                 $results_refactored{ $current_gene_id }->{ 'designs' }->{ $current_design_id }->{ 'design_details' } = $design_details;
 
             } catch {
@@ -1216,7 +1599,7 @@ sub _refactor_selected_clones {
                 TRACE "Exception: ".$_;
 
                 # increment counter
-                $self->inc_counter_failed_allele_selects;
+                $self->inc_counter_failed_no_dre_allele_selects;
 
                 # add details tp failed hash for report
                 $self->failed_allele_selects->{ $current_gene_id } = $current_design_id;
@@ -1296,7 +1679,7 @@ sub _select_lims2_design_details {
     #   Mutation type     - e.g. Cre Knock In            -> hardcoded
     $new_mutation_details{ 'mutation_type' }      = 'Cre Knock In'; #change this for any deletions?
 
-    #   Mutation subtype  - e.g. ?                       -> hardcoded
+    #   Mutation subtype  -                              -> not set
     #$new_mutation_details{ 'mutation_subtype' }   = undef;
 
     #   Cassette          - e.g. pL1L2_GT0_LF2A          -> summaries.final_pick_cassette_name
@@ -1313,7 +1696,7 @@ sub _select_lims2_design_details {
     #   Backbone          - e.g. L3L4_pD223_DTA_T_spec   -> summaries.final_pick_backbone_name
     $new_mutation_details{ 'backbone' }           = $result->{ 'vector_backbone_name' };
 
-    #   Floxed Exon       - e.g. ?                       -> from designs.target_transcript
+    #   Floxed Exon                                     -> from designs.target_transcript
     $new_mutation_details{ 'floxed_start_exon' }  = $design_info->first_floxed_exon->stable_id;
     $new_mutation_details{ 'floxed_end_exon' }    = $design_info->last_floxed_exon->stable_id;
 
@@ -1415,20 +1798,20 @@ sub _select_lims2_targeting_vector_details {
 
     my %new_targeting_vectors;
     # Targeting Vectors (multiple rows)
-    #   Pipeline             - e.g. EUCOMMToolsCre          -> hardcoded
+    # Pipeline             - e.g. EUCOMMToolsCre          -> hardcoded
     $new_targeting_vectors{ 'pipeline_name' }       = 'EUCOMMToolsCre';
     $new_targeting_vectors{ 'pipeline_id' }         = 8;
 
-    #   IKMC project ID      - e.g. 125168                  -> create this from pipeline and allele id if not found in LIMS2 e.g. EUCOMMToolsCre_23456
+    # IKMC project ID      - e.g. 125168                  -> create this from pipeline and allele id if not found in LIMS2 e.g. EUCOMMToolsCre_23456
     $new_targeting_vectors{ 'ikmc_project_id' }     = $result->{ 'htgt_project_id' };
 
-    #   Targeting vector     - e.g. ETPG0008_Z_3_B03        -> from summaries.final_pick_plate_name and _well_name
+    # Targeting vector     - e.g. ETPG0008_Z_3_B03        -> from summaries.final_pick_plate_name and _well_name
     $new_targeting_vectors{ 'targeting_vector' }    = $targeting_vector_id;
 
-    #   Intermediate vector  - e.g. ETPCS0008_A_1_C03       -> from summaries.int_plate_name and _well_name
+    # Intermediate vector  - e.g. ETPCS0008_A_1_C03       -> from summaries.int_plate_name and _well_name
     $new_targeting_vectors{ 'intermediate_vector' } = $intermediate_vector_id;
 
-    #   Report to public     - e.g. boolean, tick or cross  -> set to true
+    # Report to public     - e.g. boolean, tick or cross  -> set to true
     $new_targeting_vectors{ 'report_to_public' }    = 1;
 
     $new_tar_vec{ 'targeting_vector_details' }      = { %new_targeting_vectors };
@@ -1469,10 +1852,10 @@ sub _get_es_clone_cell_details {
     #   Targeting Vector          - e.g. ETPG0008_Z_3_B03        -> from summaries.final_pick_plate_name and _well_name
     $es_cell_details{ 'targeting_vector' }              = $targeting_vector_id;
 
-    #   MGI Allele ID             - e.g. empty...                -> ?
+    #   MGI Allele ID             - e.g. empty...                -> TODO: add MGI Allele ID
     $es_cell_details{ 'mgi_allele_id' }                 = 'tbc';
 
-    #   Allele symbol superscript - e.g. empty...                -> ?
+    #   Allele symbol superscript - e.g. hardcoded
     $es_cell_details{ 'allele_symbol_superscript' }     = 'tm1(CreERT2_EGFP)Wtsi';
 
     #   Parental Cell Line        - e.g. JM8.N4                  -> from summaries.ep_first_cell_line_name
@@ -1483,6 +1866,9 @@ sub _get_es_clone_cell_details {
 
     #   Report to public          - e.g. boolean, same as accepted flag so use that
     #$es_cell_details{ 'report_to_public' }             = $result->{ 'clone_accepted' };
+
+    # electroporation Recombinase ID
+    $es_cell_details{ 'ep_recombinase' }                = $result->{ 'ep_recombinase' };
 
     $new_clone->{ 'es_cell_details' }                   = { %es_cell_details };
 
@@ -1495,6 +1881,7 @@ sub _get_es_clone_qc_metric_details {
     my %qc_metrics = ();
     #   QC Metrics
     #     Production Centre Screen
+    # TODO: fill in QC metrics
     #       5' Screen                - e.g. empty...             -> ?
     $qc_metrics{ 'production_centre_screen' }->{ 'five_prime_screen' }     = 'tbc';
 
@@ -1661,6 +2048,7 @@ SELECT pr.project_id
 , s.final_pick_cassette_promoter AS vector_cassette_promotor
 , s.final_pick_backbone_name AS vector_backbone_name
 , s.ep_first_cell_line_name AS cell_line
+, s.ep_well_recombinase_id AS ep_recombinase
 , s.ep_pick_plate_name AS clone_plate_name
 , s.ep_pick_plate_id AS clone_plate_id
 , s.ep_pick_well_name AS clone_well_name
@@ -1729,6 +2117,7 @@ GROUP by pr.project_id
 , s.final_pick_cassette_promoter
 , s.final_pick_backbone_name
 , s.ep_first_cell_line_name
+, s.ep_well_recombinase_id
 , s.ep_pick_plate_name
 , s.ep_pick_plate_id 
 , s.ep_pick_well_name
