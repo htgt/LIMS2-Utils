@@ -934,7 +934,7 @@ sub _check_es_cell_against_tarmits {
 
             # check the clone is linked to the correct allele ID: if clone is Dre'd but attached to no-Dre allele update it
             if ( $self->curr_clone_has_dre && ( $curr_allele_id eq $self->curr_allele_no_dre_id ) ) {
-                DEBUG "Identified need to update allele ID from ".$curr_allele_id." to ".$self->curr_allele_no_dre_id;
+                DEBUG "Identified need to update allele ID from ".$curr_allele_id." to ".$self->curr_allele_dre_id;
 
                 # need to update clone allele ID as pointing at the wrong allele
                 if( !$self->_update_clone_allele_id() ) {
