@@ -10,7 +10,7 @@ use EngSeqBuilder;
 use JSON;
 use LIMS2::Model::Util::EngSeqParams qw ( generate_well_eng_seq_params );
 
-use Smart::Comments;
+# use Smart::Comments;
 
 has model => (
     is         => 'ro',
