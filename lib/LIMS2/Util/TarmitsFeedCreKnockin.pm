@@ -116,6 +116,13 @@ has curr_allele_no_dre_genbank_updated => (
     required   => 0,
 );
 
+has curr_allele_no_dre_genbank_vector_updated => (
+    is         => 'rw',
+    isa        => 'Int',
+    default    => 0,
+    required   => 0,
+);
+
 has curr_allele_no_dre_genbank_db_id => (
     is         => 'rw',
     isa        => 'Maybe[Int]',
@@ -214,8 +221,8 @@ for my $name (
         counter_es_cell_allele_id_updates
         counter_failed_es_cell_allele_id_updates
         counter_failed_es_cell_rtp_updates
-        counter_es_cell_asym_updates
-        counter_failed_es_cell_asym_updates
+        counter_es_cell_allele_symb_updates
+        counter_failed_es_cell_allele_symb_updates
         counter_ignored_es_cells
         counter_failed_es_cell_inserts
         counter_successful_no_dre_genbank_checks
@@ -358,13 +365,13 @@ sub check_clones_against_tarmits {
     INFO "Count of rows where ES Cell report to public flag was updated to TRUE: "    .$self->counter_es_cell_rtp_updates_to_true;
     INFO "Count of rows where ES Cell report to public flag was updated to FALSE: "   .$self->counter_es_cell_rtp_updates_to_false;
     INFO "Count of rows where ES Cell ikmc project ID was updated: "                  .$self->counter_es_cell_ikmc_proj_id_updates;
-    INFO "Count of rows where ES Cell allele symbol superscript flag was updated: "   .$self->counter_es_cell_asym_updates;
+    INFO "Count of rows where ES Cell allele symbol superscript flag was updated: "   .$self->counter_es_cell_allele_symb_updates;
     INFO "Count of rows where ES Cell allele ID was updated: "                        .$self->counter_es_cell_allele_id_updates;
     INFO "Count of IGNORED rows for ES Cells: "                                       .$self->counter_ignored_es_cells;
     INFO "---";
     INFO "Count of FAILED rows for ES Cell report to public flag updates: "           .$self->counter_failed_es_cell_rtp_updates;
     INFO "Count of FAILED rows for ES Cell ikmc project ID updates: "                 .$self->counter_failed_es_cell_ikmc_proj_id_updates;
-    INFO "Count of FAILED rows for ES Cell allele symbol superscript flag updates: "  .$self->counter_failed_es_cell_asym_updates;
+    INFO "Count of FAILED rows for ES Cell allele symbol superscript flag updates: "  .$self->counter_failed_es_cell_allele_symb_updates;
     INFO "Count of FAILED rows for ES Cell allele ID updates: "                       .$self->counter_failed_es_cell_allele_id_updates;
     INFO "-------------- Tarmits update End ---------------";
 
@@ -433,7 +440,8 @@ sub _check_for_existing_no_dre_allele {
     $self->curr_allele_no_dre_id ( undef );
     $self->curr_allele_no_dre_genbank_exists ( 0 );
     $self->curr_allele_no_dre_genbank_db_id ( undef );
-    $self->curr_allele_no_dre_genbank_updated( 0 );
+    $self->curr_allele_no_dre_genbank_updated ( 0 );
+    $self->curr_allele_no_dre_genbank_vector_updated ( 0 );
 
     my $cassette = $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' };
 
@@ -549,6 +557,8 @@ sub _check_for_existing_allele {
 sub _insert_no_dre_allele {
     my ( $self ) = @_;
 
+    DEBUG "Inserting no Dre allele";
+
     my $cassette = $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' };
 
     my $insert_allele_params = $self->_generate_insert_allele_params( $cassette );
@@ -586,10 +596,12 @@ sub _insert_no_dre_allele {
 sub _insert_dre_allele {
     my ( $self ) = @_;
 
-    my $cassette = $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' };
-    $cassette = $cassette.'_dre';
+    DEBUG "Inserting Dre allele";
 
-    my $insert_allele_params = $self->_generate_insert_allele_params( $cassette );
+    my $cassette = $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' };
+    my $modified_cassette = $cassette.'_dre';
+
+    my $insert_allele_params = $self->_generate_insert_allele_params( $modified_cassette );
 
     try {
         my $insert_allele_results = $self->tm->create_allele( $insert_allele_params );
@@ -923,11 +935,18 @@ sub _check_es_cell_against_tarmits {
 
         # if force updates is on
         if ( $self->force_updates ) {
-            DEBUG "Force updates is on, updating ikmc project ID";
+            DEBUG "Force updates: updating ikmc project ID";
 
             # update the ikmc project ID for this es cell clone
             if (!$self->_update_clone_ikmc_project_id() ) {
                 ERROR "Failed to update es cell clone ikmc project id for clone name: ".$self->curr_clone_name;
+            }
+
+            DEBUG "Force updates: updating allele symbol superscript";
+
+            #   update the allele symbol superscript
+            if (!$self->_update_clone_allele_symbol_superscript() ) {
+                ERROR "Failed to update es cell clone allele symbol superscript for clone name: ".$self->curr_clone_name;
             }
 
             DEBUG "Force updates: checking whether need to update allele ID";
@@ -962,17 +981,6 @@ sub _check_es_cell_against_tarmits {
         }
         else {
             DEBUG "Did not need to update report to public flag";
-        }
-
-        DEBUG "Check allele symbol superscript for gene";
-
-        # check allele symbol superscript set for ES clone, if not set it
-        if ( not defined ( $clone_find_results->[0]->{ 'allele_symbol_superscript' } ) ) {
-            DEBUG "Allele symbol superscript not set, updating";
-            $self->_update_clone_allele_symbol();
-        }
-        else {
-            DEBUG "ES Cells allele symbol superscript already set";
         }
     }
     else
@@ -1079,38 +1087,42 @@ sub _update_clone_report_to_public_flag {
     return;
 }
 
-sub _update_clone_allele_symbol {
+sub _update_clone_allele_symbol_superscript {
     my ( $self ) = @_;
 
-    DEBUG "ES Cells allele symbol superscript empty, attempting to update";
+    DEBUG "Updating clone mgi allele symbol superscript";
+
+    my $update_ok = 0;
 
     try {
         my $update_es_cell_params = {
-            'allele_symbol_superscript' => $self->curr_clone->{ 'es_cell_details' }->{ 'allele_symbol_superscript' },
+            'mgi_allele_symbol_superscript' => $self->curr_clone->{ 'es_cell_details' }->{ 'mgi_allele_symbol_superscript' },
         };
 
         # update takes the id of the item plus the updated parameters
         my $clone_update_resultset = $self->tm->update_es_cell( $self->curr_es_cell_clone_id, $update_es_cell_params );
 
         if ( defined $clone_update_resultset && $clone_update_resultset != 0 ) {
-            $self->inc_counter_es_cell_asym_updates;
+            $self->inc_counter_es_cell_allele_symb_updates;
 
-            INFO "Updated allele symbol superscript for ES cell clone ID: $self->curr_es_cell_clone_id successfully, continuing";
+            INFO "Updated allele symbol superscript for ES cell clone ID: ".$self->curr_es_cell_clone_id." to ".$self->curr_clone->{ 'es_cell_details' }->{ 'mgi_allele_symbol_superscript' };
+
+            $update_ok = 1;
         }
         else {
-            $self->inc_counter_failed_es_cell_asym_updates;
+            $self->inc_counter_failed_es_cell_allele_symb_updates;
 
-            WARN "Check on update of allele symbol superscript for ES cell clone failed for gene: ".$self->curr_gene_mgi_id.", design: ".$self->curr_design_id.", targeting vector: ".$self->curr_targeting_vector_name.", es cell clone name: ".$self->curr_clone_name;
+            WARN "Check on update of allele symbol superscript for ES cell clone failed for gene: ".$self->curr_gene_mgi_id.", es cell clone name: ".$self->curr_clone_name;
         }
     }
     catch {
-        $self->inc_counter_failed_es_cell_asym_updates;
+        $self->inc_counter_failed_es_cell_allele_symb_updates;
 
-        ERROR "FAILED allele symbol superscript update for ES Cell clone for gene: ".$self->curr_gene_mgi_id.", design: ".$self->curr_design_id.", targeting vector: ".$self->curr_targeting_vector_name.", es cell clone name: ".$self->curr_clone_name;
+        ERROR "FAILED allele symbol superscript update for ES Cell clone for gene: ".$self->curr_gene_mgi_id.", es cell clone name: ".$self->curr_clone_name;
         ERROR "Exception: ".$_;
     };
 
-    return;
+    return $update_ok;
 }
 
 sub _update_clone_allele_id {
@@ -1126,7 +1138,7 @@ sub _update_clone_allele_id {
         };
 
         # update takes the id of the item plus the updated parameters
-        my $clone_update_resultset = $self->tm->update_es_cell( $self->curr_allele_no_dre_id, $update_clone_params );
+        my $clone_update_resultset = $self->tm->update_es_cell( $self->curr_es_cell_clone_id, $update_clone_params );
 
         if ( defined $clone_update_resultset && ( $clone_update_resultset->{ 'id' } == $self->curr_es_cell_clone_id ) ) {
             $self->inc_counter_es_cell_allele_id_updates;
@@ -1170,20 +1182,20 @@ sub _insert_clone {
     DEBUG "Allele ID to insert: ".$allele_id;
 
     my $insert_es_cell_params = {
-        'name'                      => $self->curr_clone_name,
-        'allele_id'                 => $allele_id,
-        'ikmc_project_id'           => $self->_select_or_create_ikmc_project_id (),
-        'targeting_vector_id'       => $self->curr_targeting_vector_id,
-        'parental_cell_line'        => $self->curr_clone->{ 'es_cell_details' }->{ 'parental_cell_line' },
-        'pipeline_id'               => $self->curr_clone->{ 'es_cell_details' }->{ 'pipeline_id' },
-        'report_to_public'          => $self->curr_clone->{ 'info' }->{ 'clone_accepted' },
-        'allele_symbol_superscript' => $self->curr_clone->{ 'es_cell_details' }->{ 'allele_symbol_superscript' },
+        'name'                          => $self->curr_clone_name,
+        'allele_id'                     => $allele_id,
+        'ikmc_project_id'               => $self->_select_or_create_ikmc_project_id (),
+        'targeting_vector_id'           => $self->curr_targeting_vector_id,
+        'parental_cell_line'            => $self->curr_clone->{ 'es_cell_details' }->{ 'parental_cell_line' },
+        'pipeline_id'                   => $self->curr_clone->{ 'es_cell_details' }->{ 'pipeline_id' },
+        'report_to_public'              => $self->curr_clone->{ 'info' }->{ 'clone_accepted' },
+        'mgi_allele_symbol_superscript' => $self->curr_clone->{ 'es_cell_details' }->{ 'mgi_allele_symbol_superscript' },
     };
-        # 'production_qc_five_prime_screen'  => $self->curr_clone->{ 'qc_metrics' }->{ 'five_prime_screen' },
-        # 'production_qc_three_prime_screen' => $self->curr_clone->{ 'qc_metrics' }->{ 'three_prime_screen' },
-        # 'production_qc_loxp_screen'        => $self->curr_clone->{ 'qc_metrics' }->{ 'loxp_screen' },
-        # 'production_qc_loss_of_allele'     => $self->curr_clone->{ 'qc_metrics' }->{ 'loss_of_allele' },
-        # 'production_qc_vector_integrity'   => $self->curr_clone->{ 'qc_metrics' }->{ 'vector_integrity' },
+    # 'production_qc_five_prime_screen'  => $self->curr_clone->{ 'qc_metrics' }->{ 'five_prime_screen' },
+    # 'production_qc_three_prime_screen' => $self->curr_clone->{ 'qc_metrics' }->{ 'three_prime_screen' },
+    # 'production_qc_loxp_screen'        => $self->curr_clone->{ 'qc_metrics' }->{ 'loxp_screen' },
+    # 'production_qc_loss_of_allele'     => $self->curr_clone->{ 'qc_metrics' }->{ 'loss_of_allele' },
+    # 'production_qc_vector_integrity'   => $self->curr_clone->{ 'qc_metrics' }->{ 'vector_integrity' },
 
     try {
         my $results_es_cell_insert = $self->tm->create_es_cell( $insert_es_cell_params );
@@ -1313,186 +1325,368 @@ sub _check_dre_genbank_files {
 sub _insert_or_update_genbank_files {
     my ( $self ) = @_;
 
-    # only process based on current clone
     if ( $self->curr_clone_has_dre ) {
-        if  ( $self->curr_allele_dre_genbank_updated ) { return; }
+        DEBUG "Insert or update genbank files: clone has Dre";
+        DEBUG "Insert or update genbank files: curr_allele_no_dre_genbank_updated = ".$self->curr_allele_no_dre_genbank_updated;
+        DEBUG "Insert or update genbank files: curr_allele_no_dre_genbank_vector_updated = ".$self->curr_allele_no_dre_genbank_vector_updated;
+        DEBUG "Insert or update genbank files: curr_allele_dre_genbank_updated = ".$self->curr_allele_dre_genbank_updated;
 
-        unless ( defined $self->curr_allele_dre_id ) {
-            ERROR "Attempt to create genbank files but missing dre allele ID";
-            return;
+        # need to check / update / insert non-dre allele with vector genbank file
+        unless ( $self->curr_allele_no_dre_genbank_updated || $self->curr_allele_no_dre_genbank_vector_updated ) {
+            DEBUG "Insert or update genbank files: no dre vector";
+            $self->_insert_or_update_no_dre_allele_vector_genbank_file();
         }
 
-        if ( $self->curr_allele_dre_genbank_exists && defined $self->curr_allele_dre_genbank_db_id ) {
-            if ( $self->force_updates ) {
-                DEBUG "Force updates: update genbank data dre clone";
-
-                # create appropriate genbank files
-                my $genbank_files = $self->_create_genbank_files( $self->curr_allele_dre_id );
-
-                # update the allele genbank data
-                my $dre_db_id = $self->curr_allele_dre_genbank_db_id;
-                DEBUG "Existing genbank data database ID: ".$dre_db_id;
-                $self->_update_genbank_files( $dre_db_id, $genbank_files );
-
-                # set flag so only update once per allele
-                $self->curr_allele_dre_genbank_updated ( 1 );
-                DEBUG "Genbank data updated";
-            }
-            else {
-                # do nothing
-                return;
-            }
-        }
-        else {
-            DEBUG "Insert genbank files dre clone";
-
-            # create appropriate genbank files
-            my $genbank_files = $self->_create_genbank_files( $self->curr_allele_dre_id );
-
-            # insert the allele genbank data
-            $self->_insert_genbank_files( $genbank_files );
-
-            # set flag so only update once per allele
-            $self->curr_allele_dre_genbank_updated ( 1 );
-            DEBUG "Genbank data inserted";
+        # need to check / update / insert dre allele with clone genbank file
+        unless ( $self->curr_allele_dre_genbank_updated ) {
+            DEBUG "Insert or update genbank files: dre clone";
+            $self->_insert_or_update_dre_allele_clone_genbank_file();
         }
     }
     else {
-        if  ( $self->curr_allele_no_dre_genbank_updated ) { return; }
-
-        unless ( defined $self->curr_allele_no_dre_id ) {
-            ERROR "Attempt to create genbank files but missing no dre allele ID";
-            return;
-        }
-
-        if ( $self->curr_allele_no_dre_genbank_exists && defined $self->curr_allele_no_dre_genbank_db_id ) {
-            if ( $self->force_updates ) {
-                DEBUG "Force updates: update genbank data no-dre clone";
-
-                # create appropriate genbank files
-                my $genbank_files = $self->_create_genbank_files( $self->curr_allele_no_dre_id );
-
-                # update the allele genbank data
-                my $no_dre_db_id = $self->curr_allele_no_dre_genbank_db_id;
-                DEBUG "Existing genbank data database ID: ".$no_dre_db_id;
-                $self->_update_genbank_files( $no_dre_db_id, $genbank_files );
-
-                # set flag so only update once per allele
-                $self->curr_allele_no_dre_genbank_updated ( 1 );
-            }
-            else {
-                # do nothing
-                return;
-            }
-        }
-        else {
-            # create appropriate genbank files
-            my $genbank_files = $self->_create_genbank_files( $self->curr_allele_no_dre_id );
-
-            # insert the allele genbank data
-            $self->_insert_genbank_files( $genbank_files );
-
-            # set flag so only update once per allele
-            $self->curr_allele_no_dre_genbank_updated ( 1 );
+        # need to check / update / insert non-dre allele with both vector and clone genbank files
+        unless ( $self->curr_allele_no_dre_genbank_updated ) {
+            DEBUG "Insert or update genbank files: no dre vector and clone";
+            $self->_insert_or_update_no_dre_allele_vector_and_clone_genbank_files();
         }
     }
 
     return;
 }
 
-sub _create_genbank_files {
-    my ( $self, $allele_id ) = @_;
+sub _insert_or_update_dre_allele_clone_genbank_file {
+    my ( $self ) = @_;
 
-    unless ( defined $self->curr_es_cell_clone_id ) {
-        ERROR "Attempt to update genbank files but missing clone ID";
+    unless ( defined $self->curr_allele_dre_id ) {
+        ERROR "Attempt to create genbank dre clone file but missing dre allele ID";
         return;
     }
 
-    unless ( defined $self->curr_targeting_vector_id ) {
-        ERROR "Attempt to update genbank files but missing targeting vector ID";
+    if ( $self->curr_allele_dre_genbank_exists && $self->curr_allele_dre_genbank_db_id ) {
+        if ( $self->force_updates ) {
+            DEBUG "Force updates: update genbank data dre clone";
+
+            # create appropriate genbank file
+            my $escell_bioseq_string = $self->_create_allele_bioseq_string();
+
+            unless ( $escell_bioseq_string ) {
+                ERROR "Failed to create Clone bioseq string for allele ID: ".$self->curr_allele_dre_id;
+                return;
+            }
+
+            my $genbank_data = {};
+            $genbank_data->{ 'allele_id' }          = $self->curr_allele_dre_id;
+            $genbank_data->{ 'escell_clone' }       = $escell_bioseq_string;
+
+            # update the allele genbank data
+            my $dre_db_id = $self->curr_allele_dre_genbank_db_id;
+            DEBUG "Existing genbank data database ID: ".$dre_db_id." for Allele ID: ".$genbank_data->{ 'allele_id' };
+
+            if ( $self->_update_genbank_files( $dre_db_id, $genbank_data ) ) {
+                DEBUG "Updated dre genbank DB ID :".$dre_db_id;
+                # set flag so only update once per allele
+                $self->curr_allele_dre_genbank_updated ( 1 );
+                $self->curr_allele_dre_genbank_exists ( 1 );
+
+                # increment counter
+                $self->inc_counter_successful_dre_genbank_file_updates;
+            }
+            else {
+                # increment counter
+                $self->inc_counter_failed_no_dre_genbank_file_updates;
+            }
+        }
+        else {
+            # do nothing
+            return;
+        }
+    }
+    else {
+        DEBUG "Insert genbank files dre clone";
+
+        # create appropriate genbank files
+        my $escell_bioseq_string = $self->_create_allele_bioseq_string();
+
+        unless ( $escell_bioseq_string ) {
+            ERROR "Failed to create Clone bioseq string for allele ID: ".$self->curr_allele_dre_id;
+            return;
+        }
+
+        my $genbank_data = {};
+        # allele ID may be dre or non-dre version depending on clone
+        $genbank_data->{ 'allele_id' }          = $self->curr_allele_dre_id;
+        $genbank_data->{ 'escell_clone' }       = $escell_bioseq_string;
+
+        # insert the allele genbank data and return the database ID  
+        my $db_id = $self->_insert_genbank_files( $genbank_data );
+        $self->curr_allele_dre_genbank_db_id ( $db_id );
+
+        if ( $self->curr_allele_dre_genbank_db_id ) {
+            DEBUG "Inserted dre genbank DB ID :".$self->curr_allele_dre_genbank_db_id;
+            # set flags so only update once per allele
+            $self->curr_allele_dre_genbank_updated ( 1 );
+            $self->curr_allele_dre_genbank_exists ( 1 );
+
+            # increment counter
+            $self->inc_counter_successful_dre_genbank_file_inserts;
+        }
+        else {
+            # increment counter
+            $self->inc_counter_failed_dre_genbank_file_inserts;
+        }
+    }
+
+    return;
+}
+
+sub _insert_or_update_no_dre_allele_vector_genbank_file {
+    my ( $self ) = @_;
+
+    unless ( defined $self->curr_allele_no_dre_id ) {
+        ERROR "Attempt to create no dre vector genbank file but missing no dre allele ID";
         return;
     }
 
-    # create both bioseq strings
+    if ( $self->curr_allele_no_dre_genbank_exists && defined $self->curr_allele_no_dre_genbank_db_id ) {
+        if ( $self->force_updates ) {
+            DEBUG "Force updates: update genbank data no-dre vector";
+
+            # create appropriate genbank files
+            my $vect_bioseq_string = $self->_create_vector_bioseq_string();
+
+            unless ( $vect_bioseq_string ) {
+                ERROR "Failed to create Vector bioseq string for allele ID: ".$self->curr_allele_no_dre_id;
+                return;
+            }
+
+            my $genbank_data = {};
+            # allele ID may be dre or non-dre version depending on clone
+            $genbank_data->{ 'allele_id' }          = $self->curr_allele_no_dre_id;
+            $genbank_data->{ 'targeting_vector' }   = $vect_bioseq_string;
+
+            # update the allele genbank data
+            my $no_dre_db_id = $self->curr_allele_no_dre_genbank_db_id;
+            DEBUG "Existing genbank data database ID: ".$no_dre_db_id." for Allele ID: ".$genbank_data->{ 'allele_id' };
+            if ( $self->_update_genbank_files( $no_dre_db_id, $genbank_data ) == 1 ) {
+                DEBUG "Updated no dre genbank DB ID :".$no_dre_db_id;
+                # set flag so only update once per allele
+                $self->curr_allele_no_dre_genbank_vector_updated ( 1 );
+                $self->curr_allele_no_dre_genbank_exists ( 1 );
+
+                # increment counter
+                $self->inc_counter_successful_no_dre_genbank_file_updates;
+            }
+            else {
+                # increment counter
+                $self->inc_counter_failed_no_dre_genbank_file_updates;
+            }
+        }
+        else {
+            # do nothing
+            return;
+        }
+    }
+    else {
+        # create appropriate genbank files
+        my $vect_bioseq_string = $self->_create_vector_bioseq_string();
+
+        unless ( $vect_bioseq_string ) {
+            ERROR "Failed to create Vector bioseq string for allele ID: ".$self->curr_allele_no_dre_id;
+            return;
+        }
+
+        my $genbank_data = {};
+        # allele ID may be dre or non-dre version depending on clone
+        $genbank_data->{ 'allele_id' }          = $self->curr_allele_no_dre_id;
+        $genbank_data->{ 'targeting_vector' }   = $vect_bioseq_string;
+
+        # insert the allele genbank data and return the database ID
+        my $db_id =  $self->_insert_genbank_files( $genbank_data );
+        $self->curr_allele_no_dre_genbank_db_id ( $db_id );
+
+        if ( $self->curr_allele_no_dre_genbank_db_id ) {
+            DEBUG "Inserted no dre genbank DB ID :".$self->curr_allele_no_dre_genbank_db_id;
+            # set flags so only update once per allele
+            $self->curr_allele_no_dre_genbank_vector_updated ( 1 );
+            $self->curr_allele_no_dre_genbank_exists ( 1 );
+
+            # increment counter
+            $self->inc_counter_successful_no_dre_genbank_file_inserts;
+        }
+        else {
+            # increment counter
+            $self->inc_counter_failed_no_dre_genbank_file_inserts;
+        }
+    }
+
+    return;
+}
+
+sub _insert_or_update_no_dre_allele_vector_and_clone_genbank_files {
+    my ( $self ) = @_;
+
+    unless ( defined $self->curr_allele_no_dre_id ) {
+        ERROR "Attempt to create genbank files but missing no dre allele ID";
+        return;
+    }
+
+    if ( $self->curr_allele_no_dre_genbank_exists && defined $self->curr_allele_no_dre_genbank_db_id ) {
+        if ( $self->force_updates ) {
+            DEBUG "Force updates: update genbank data both no-dre vector and clone";
+            $self->_update_genbank_files_no_dre_vector_and_clone();
+        }
+        else {
+            # if vector already updated we still need to update clone 
+            if ( $self->curr_allele_no_dre_genbank_vector_updated ) {
+
+                # vector may already have been updated, safe to override with vector and clone
+                $self->_update_genbank_files_no_dre_vector_and_clone();
+            }
+            else {
+                # do nothing
+                return;
+            }
+        }
+    }
+    else {
+        # create appropriate genbank files
+        my $vect_bioseq_string = $self->_create_vector_bioseq_string();
+        my $escell_bioseq_string = $self->_create_allele_bioseq_string();
+
+        unless ( $vect_bioseq_string && $escell_bioseq_string ) {
+            ERROR "Failed to create both Vector and Clone bioseq strings for allele ID: ".$self->curr_allele_no_dre_id;
+            return;
+        }
+
+        my $genbank_data = {};
+        # allele ID may be dre or non-dre version depending on clone
+        $genbank_data->{ 'allele_id' }          = $self->curr_allele_no_dre_id;
+        $genbank_data->{ 'targeting_vector' }   = $vect_bioseq_string;
+        $genbank_data->{ 'escell_clone' }       = $escell_bioseq_string;
+
+        # insert the allele genbank data and return the database ID
+        my $db_id = $self->_insert_genbank_files( $genbank_data );
+        $self->curr_allele_no_dre_genbank_db_id ( $db_id );
+
+        if ( $self->curr_allele_no_dre_genbank_db_id ) {
+            DEBUG "Inserted no dre genbank DB ID :".$self->curr_allele_no_dre_genbank_db_id;
+            # set flags so only update once per allele
+            $self->curr_allele_no_dre_genbank_updated ( 1 );
+            $self->curr_allele_no_dre_genbank_exists ( 1 );
+
+            # increment counter
+            $self->inc_counter_successful_no_dre_genbank_file_inserts;
+        }
+        else {
+            # increment counter
+            $self->inc_counter_failed_no_dre_genbank_file_inserts;
+        }
+    }
+
+    return;
+}
+
+sub _update_genbank_files_no_dre_vector_and_clone {
+    my ( $self ) = @_;
+
+    # create appropriate genbank files
     my $vect_bioseq_string = $self->_create_vector_bioseq_string();
     my $escell_bioseq_string = $self->_create_allele_bioseq_string();
 
+    unless ( $vect_bioseq_string && $escell_bioseq_string ) {
+        ERROR "Failed to create both Vector and Clone bioseq strings for allele ID: ".$self->curr_allele_no_dre_id;
+        return;
+    }
+
     my $genbank_data = {};
     # allele ID may be dre or non-dre version depending on clone
-    $genbank_data->{ 'allele_id' }          = $allele_id;
+    $genbank_data->{ 'allele_id' }          = $self->curr_allele_no_dre_id;
     $genbank_data->{ 'targeting_vector' }   = $vect_bioseq_string;
     $genbank_data->{ 'escell_clone' }       = $escell_bioseq_string;
 
-    return $genbank_data;
+    # update the allele genbank data
+    my $no_dre_db_id = $self->curr_allele_no_dre_genbank_db_id;
+    DEBUG "Existing genbank data database ID: ".$no_dre_db_id." for Allele ID: ".$genbank_data->{ 'allele_id' };
+    if ( $self->_update_genbank_files( $no_dre_db_id, $genbank_data ) ) {
+        DEBUG "Updated no dre genbank DB ID :".$no_dre_db_id;
+        # set flag so only update once per allele
+        $self->curr_allele_no_dre_genbank_updated ( 1 );
+        $self->curr_allele_no_dre_genbank_exists ( 1 );
+
+        # increment counter
+        $self->inc_counter_successful_no_dre_genbank_file_updates;
+    }
+    else {
+        # increment counter
+        $self->inc_counter_failed_dre_genbank_file_updates;
+    }
+
+    return;
 }
 
 sub _insert_genbank_files {
     my ( $self, $genbank_data ) = @_;
 
-    my $tarmits_obj;
-    try {
-        $tarmits_obj = $self->tm->create_genbank_file( $genbank_data );
+    DEBUG "Inserting genbank files for allele ID: ".$genbank_data->{ 'allele_id' };
 
-        DEBUG "Inserted genbank files for allele ID: ".$genbank_data->{ 'allele_id' };
-        # increment counter
-        if( $self->curr_clone_has_dre ) {
-            $self->inc_counter_successful_dre_genbank_file_inserts;
-        }
-        else {
-            $self->inc_counter_successful_no_dre_genbank_file_inserts;
+    my $genbank_db_id = 0;
+    my $tarmits_hash_result;
+    try {
+        $tarmits_hash_result = $self->tm->create_genbank_file( $genbank_data );
+
+        DEBUG "Successfully inserted genbank files for allele ID: ".$genbank_data->{ 'allele_id' };
+
+        # fetch genbank database id
+        if ( defined $tarmits_hash_result && $tarmits_hash_result->{ 'allele_id' } > 0 ) {
+            # check allele ID
+            my $tarmits_allele_id = $tarmits_hash_result->{ 'allele_id' };
+            DEBUG "Tarmits allele ID returned from insert: ".$tarmits_allele_id;
+
+            $genbank_db_id = $tarmits_hash_result->{ 'id' };
+            DEBUG "Returned genbank DB ID: ".$genbank_db_id;
         }
     }
     catch {
         WARN "Unable to insert genbank files for allele ID: ".$genbank_data->{ 'allele_id' };
         WARN "Exception: ".$_;
-
-        # increment counter
-        if( $self->curr_clone_has_dre ) {
-            $self->inc_counter_failed_dre_genbank_file_inserts;
-        }
-        else {
-            $self->inc_counter_failed_no_dre_genbank_file_inserts;
-        }
     };
 
-    return;
+    return $genbank_db_id;
 }
 
 sub _update_genbank_files {
     my ( $self, $db_id, $genbank_data ) = @_;
 
-    my $tarmits_obj;
+    DEBUG "Updating genbank files for allele ID: ".$genbank_data->{ 'allele_id' }." and database ID: ".$db_id;
+
+    my $success = 0;
+    my $tarmits_hash_result;
     try {
-        $tarmits_obj = $self->tm->update_genbank_file( $db_id, $genbank_data );
+        $tarmits_hash_result = $self->tm->update_genbank_file( $db_id, $genbank_data );
 
-        DEBUG "Updated genbank files for allele ID: ".$genbank_data->{ 'allele_id' }." and database ID: ".$db_id;
-
-        # increment counter
-        if( $self->curr_clone_has_dre ) {
-            $self->inc_counter_successful_dre_genbank_file_updates;
+        if ( defined $tarmits_hash_result && ( $tarmits_hash_result->{ 'id' } == $db_id ) ) {
+            DEBUG "Successfully updated genbank files for allele ID: ".$genbank_data->{ 'allele_id' }." and database ID: ".$db_id;
+            $success = 1;
         }
         else {
-            $self->inc_counter_successful_no_dre_genbank_file_updates;
+            ERROR "Returned database ID after genbank update does not match expected ID";
         }
     }
     catch {
         WARN "Unable to update genbank files for allele ID: ".$genbank_data->{ 'allele_id' };
         WARN "Exception: ".$_;
-
-        # increment counter
-        if( $self->curr_clone_has_dre ) {
-            $self->inc_counter_failed_dre_genbank_file_updates;
-        }
-        else {
-            $self->inc_counter_failed_no_dre_genbank_file_updates;
-        }
     };
 
-    return;
+    return $success;
 }
 
 sub _create_allele_bioseq_string {
     my ( $self ) = @_;
+
+    unless ( defined $self->curr_es_cell_clone_id ) {
+        ERROR "Attempt to update genbank files but missing es clone ID";
+        return;
+    }
 
     my $es_cell_lims2_well_id = $self->curr_clone->{ 'info' }->{ 'clone_well_id' };
 
@@ -1514,6 +1708,11 @@ sub _create_allele_bioseq_string {
 
 sub _create_vector_bioseq_string {
     my ( $self ) = @_;
+
+    unless ( defined $self->curr_targeting_vector_id ) {
+        ERROR "Attempt to create vector bioseq files but missing targeting vector well ID";
+        return;
+    }
 
     my $vector_lims2_well_id = $self->curr_targeting_vector->{ 'info' }->{ 'targeting_vector_well_id' };
 
@@ -1855,9 +2054,6 @@ sub _get_es_clone_cell_details {
     #   MGI Allele ID             - e.g. empty...                -> TODO: add MGI Allele ID
     $es_cell_details{ 'mgi_allele_id' }                 = 'tbc';
 
-    #   Allele symbol superscript - e.g. hardcoded
-    $es_cell_details{ 'allele_symbol_superscript' }     = 'tm1(CreERT2_EGFP)Wtsi';
-
     #   Parental Cell Line        - e.g. JM8.N4                  -> from summaries.ep_first_cell_line_name
     $es_cell_details{ 'parental_cell_line' }            = $result->{ 'cell_line' };
 
@@ -1869,6 +2065,14 @@ sub _get_es_clone_cell_details {
 
     # electroporation Recombinase ID
     $es_cell_details{ 'ep_recombinase' }                = $result->{ 'ep_recombinase' };
+
+    #   Allele symbol superscript - hardcoded
+    if ( $result->{ 'ep_recombinase' } eq 'Dre' ) {
+        $es_cell_details{ 'mgi_allele_symbol_superscript' } = 'tm1.1(EGFP_CreERT2)Wtsi'; # for Dre
+    }
+    else {
+        $es_cell_details{ 'mgi_allele_symbol_superscript' } = 'tm1(EGFP_CreERT2)Wtsi'; # for non Dre
+    }
 
     $new_clone->{ 'es_cell_details' }                   = { %es_cell_details };
 
