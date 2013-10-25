@@ -41,7 +41,7 @@ note( 'Check get_exon_rank' );
 
 ok my $transcript = $u->transcript_adaptor->fetch_by_stable_id( 'ENSMUST00000025519' ), 'can fetch transcript';
 isa_ok $transcript, 'Bio::EnsEMBL::Transcript';
-is $u->get_exon_rank( $transcript, 'ENSMUSE00001117273' ), 1, 'first exon rank correct';
+is $u->get_exon_rank( $transcript, 'ENSMUSE00001248376' ), 1, 'first exon rank correct';
 is $u->get_exon_rank( $transcript, 'ENSMUSE00000572374' ), 5, 'fifth exon rank correct';
 
 note( 'Check get_gene_from_exon_id' );

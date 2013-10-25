@@ -1,7 +1,7 @@
 package LIMS2::Util::FarmJobRunner;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::FarmJobRunner::VERSION = '0.018';
+    $LIMS2::Util::FarmJobRunner::VERSION = '0.021';
 }
 ## use critic
 
@@ -92,6 +92,10 @@ sub submit {
     if ( exists $args{ dependencies } ) {
         push @bsub, $self->_build_job_dependency( $args{ dependencies } );
     }
+
+    #
+    #TODO: add ' around cmd
+    #
 
     #add the actual command at the very end.
     push @bsub, @{ $args{ cmd } };

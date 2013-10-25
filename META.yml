@@ -24,8 +24,10 @@ requires:
   Class::Data::Inheritable: 0
   Const::Fast: 0
   Data::Dumper: 0
+  EngSeqBuilder: 0
   File::Which: 0
   Getopt::Long: 0
+  HTTP::Request: 0
   Hash::MoreUtils: 0
   IO::File: 0
   IO::String: 0
@@ -35,6 +37,7 @@ requires:
   LIMS2::Exception: 0
   LIMS2::Model: 0
   LIMS2::Model::Util::DesignInfo: 0
+  LIMS2::Model::Util::EngSeqParams: 0
   LWP::UserAgent: 0
   List::MoreUtils: 0
   Log::Log4perl: 0
@@ -50,6 +53,7 @@ requires:
   Readonly: 0
   Scalar::Util: 0
   Sub::Exporter: 0
+  Template: 0
   Template::Plugin: 0
   Try::Tiny: 0
   URI: 0
@@ -58,4 +62,4 @@ requires:
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.018
+version: 0.021

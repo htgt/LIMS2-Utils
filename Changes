@@ -1,3 +1,15 @@
+0.021     2013-10-25 15:27:45 Europe/London
+	Modified Tarmits feed to add additional force updates and to handle Dre and non-Dre clones.
+
+0.020     2013-08-28 10:39:23 Europe/London
+
+    Updated Errbit module to automatically skip errors that aren't exceptions
+
+0.019     2013-08-27 11:48:43 Europe/London
+
+    Added check to see if log4perl is already initialized.
+    Added Errbit helper module
+
 0.018     2013-08-09 09:46:44 Europe/London
 	Added functionality to Tarmits feed to update Tarmits for  non-accepted clones in LIMS2
 
