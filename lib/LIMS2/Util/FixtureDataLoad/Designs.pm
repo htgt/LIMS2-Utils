@@ -16,20 +16,32 @@ use Moose;
 use Try::Tiny;
 use namespace::autoclean;
 
-use Smart::Comments;
-
 extends qw( LIMS2::Util::FixtureDataLoad );
 
 sub retrieve_or_create_design {
     my ( $self, $design_id ) = @_;
-    #Log::Log4perl::NDC->push( $design_id );
+    Log::Log4perl::NDC->push( $design_id );
 
     $self->log->info( "Retrieve or create design $design_id" );
 
-    $self->retrieve_destination_design($design_id)
-        || $self->create_destination_design( $self->build_design_data($design_id) );
+    return if $self->retrieve_destination_design($design_id);
 
-    #Log::Log4perl::NDC->pop;
+    try{
+        $self->dest_model->txn_do(
+            sub {
+                $self->create_destination_design( $design_id );
+                if ( !$self->persist ) {
+                    $self->log->debug('Rollback');
+                    $self->dest_model->txn_rollback;
+                }
+            }
+        );
+    }
+    catch {
+        $self->log->error("Error creating design: $_");
+    };
+
+    Log::Log4perl::NDC->pop;
 
     return;
 }
@@ -51,40 +63,23 @@ sub retrieve_destination_design {
 }
 
 sub create_destination_design {
-    my ( $self, $design_data ) = @_;
+    my ( $self, $design_id ) = @_;
 
-    try{
-        $self->dest_model->txn_do(
-            sub {
-                #$self->dest_model->create_design( $design_data );
-                $self->dest_model->schema->resultset('Design')->create( $design_data );
-                #$self->dest_model->txn_rollback;
-            }
-        );
-        $self->log->info( "Design created" );
+    my $design = $self->source_model->schema->resultset( 'Design' )->find( { 'id' => $design_id } );
+    unless ( $design ) {
+        $self->log->logdie( 'Could not retrieve design from source' );
     }
-    catch {
-        $self->log->error( "Failed to create design: $_" );
-    };
+    my $design_data = $self->build_design_data( $design );
+
+    $self->dest_model->create_design( $design_data );
+    $self->log->info( "Design created" );
 
     return;
 }
 
 sub build_design_data {
-    my ( $self, $design_id ) = @_;
-    $self->log->debug( 'Build design data' );
-
-    my $design = $self->source_model->schema->resultset( 'Design' )->find( { 'id' => $design_id } );
-
-    unless ( $design ) {
-        $self->log->logdie( 'Could not retrieve design from source' );
-    }
-
-    return $self->get_design_data( $design );
-}
-
-sub get_design_data {
     my ( $self, $design ) = @_;
+    $self->log->debug( 'Build design data' );
 
     # requirements as per Design plugin create method
     # my $design_data = {
@@ -105,27 +100,34 @@ sub get_design_data {
     # };
 
     # fetch data as hash from existing design object
-    my $design_data = $design->as_hash( 1 );
+    my $design_data = $design->as_hash( 0 );
+    $self->create_user( $design->created_by );
 
-    $design_data->{ gene_ids } = $design_data->{ assigned_genes };
-    delete( $design_data->{ assigned_genes } );
+    my @genes;
+    for my $g ( $design->genes->all ) {
+        push @genes, {
+            gene_id      => $g->gene_id,
+            gene_type_id => $g->gene_type_id,
+        };
+        $self->create_user( $g->created_by );
+    }
+    $design_data->{gene_ids} = \@genes;
+    delete( $design_data->{assigned_genes} );
 
-    #each gene in gene_ids needs gene id and type id
-    #gene_id      => $g->{gene_id},
-    #gene_type_id => $g->{gene_type_id},
+    delete( $design_data->{oligos_fasta} );
 
-    $design_data->{ created_by } = 'test_user@example.org'; #$design->created_by->id;
+    for my $oligo ( @{ $design_data->{oligos} } ) {
+        $oligo->{design_id} = $design->id;
+        delete( $oligo->{id} );
+        my $loci = delete( $oligo->{locus} );
+        delete( $loci->{species} );
+        $oligo->{loci} = [ $loci ];
+    }
 
-    ##$design_data
+    delete( $_->{id} ) for @{ $design_data->{genotyping_primers} };
+    delete( $_->{id} ) for @{ $design_data->{comments} };
 
-    my %data = $design->get_columns;
-    #TODO universal user creation sp12 Fri 25 Oct 2013 08:22:10 BST
-    $data{created_by} = 1081;
-
-    ### %data
-
-    #return $design_data;
-    return \%data;
+    return $design_data;
 }
 
 
