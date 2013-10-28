@@ -81,28 +81,13 @@ sub build_design_data {
     my ( $self, $design ) = @_;
     $self->log->debug( 'Build design data' );
 
-    # requirements as per Design plugin create method
-    # my $design_data = {
-    #     species                 => $design->species,
-    #     id                      => $design->id,
-    #     type                    => $design->type,
-    #     created_at              => $design->created_at,
-    #     created_by              => $design->created_by->id,
-    #     phase                   => $design->phase,
-    #     validated_by_annotation => $design->validated_by_annotation,
-    #     name                    => $design->name,
-    #     target_transcript       => $design->target_transcript,
-    #     oligos                  => $design->oligos,
-    #     genotyping_primers      => $design->genotyping_primers,
-    #     comments                => $design->comments,
-    #     gene_ids                => $design->gene_ids,
-    #     cassette_first          => 
-    # };
-
     # fetch data as hash from existing design object
     my $design_data = $design->as_hash( 0 );
+
+    # create user if they do not already exist
     $self->create_user( $design->created_by );
 
+    # create gene_design data
     my @genes;
     for my $g ( $design->genes->all ) {
         push @genes, {
@@ -112,10 +97,8 @@ sub build_design_data {
         $self->create_user( $g->created_by );
     }
     $design_data->{gene_ids} = \@genes;
-    delete( $design_data->{assigned_genes} );
 
-    delete( $design_data->{oligos_fasta} );
-
+    # format oligo loci data
     for my $oligo ( @{ $design_data->{oligos} } ) {
         $oligo->{design_id} = $design->id;
         delete( $oligo->{id} );
@@ -124,7 +107,10 @@ sub build_design_data {
         $oligo->{loci} = [ $loci ];
     }
 
+    # delete unwanted information
     delete( $_->{id} ) for @{ $design_data->{genotyping_primers} };
+    delete( $design_data->{assigned_genes} );
+    delete( $design_data->{oligos_fasta} );
     delete( $_->{id} ) for @{ $design_data->{comments} };
 
     return $design_data;
