@@ -46,6 +46,12 @@ has dest_model => (
     init_arg => undef,
 );
 
+has persist => (
+    is      => 'ro',
+    isa     => 'Bool',
+    default => 0,
+);
+
 sub BUILD {
     my $self = shift;
 
@@ -63,6 +69,33 @@ sub BUILD {
     my $source_schema = LIMS2::Model::DBConnect->connect( 'LIMS2_DB', 'lims2' );
     my $source_model = LIMS2::Model->new( user => 'lims2', schema => $source_schema );
     $self->source_model( $source_model );
+}
+
+sub create_user {
+    my ( $self, $user ) = @_;
+
+    $self->dest_model->schema->resultset('User')->find_or_create(
+        { $user->get_columns }
+    );
+
+    return;
+}
+
+sub get_dbix_row_data {
+    my ( $self, $row ) = @_;
+
+    my %data = $row->get_columns;
+
+    # if record is linked to a user via created_by then make sure
+    # the user record exists in the destination db
+    if ( exists $data{created_by} ) {
+        my $user = $row->created_by;
+        $self->dest_model->schema->resultset('User')->find_or_create(
+            { $user->get_columns }
+        );
+    }
+
+    return \%data;
 }
 
 __PACKAGE__->meta->make_immutable;
