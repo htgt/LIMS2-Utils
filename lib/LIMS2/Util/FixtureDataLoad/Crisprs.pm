@@ -27,15 +27,7 @@ sub retrieve_or_create_crispr {
     return if $self->retrieve_destination_crispr($crispr_id);
 
     try{
-        $self->dest_model->txn_do(
-            sub {
-                $self->create_destination_crispr( $crispr_id );
-                if ( !$self->persist ) {
-                    $self->log->debug('Rollback');
-                    $self->dest_model->txn_rollback;
-                }
-            }
-        );
+        $self->create_destination_crispr( $crispr_id );
     }
     catch {
         $self->log->error("Error creating crispr: $_");
@@ -78,13 +70,8 @@ sub retrieve_destination_crispr {
     my ( $self, $crispr_id ) = @_;
     $self->log->debug( "Attempting to retrieve crispr from destination DB" );
 
-    my $crispr = try {
-        $self->dest_model->schema->resultset( 'Crispr' )->find( { 'id' => $crispr_id } );
-    }
-    catch {
-        $_->throw() unless $_->not_found;
-        undef;
-    };
+    my $crispr = $self->dest_model->schema->resultset( 'Crispr' )->find( { 'id' => $crispr_id } );
+
     $self->log->info( "Crispr already exists in the destination DB" ) if $crispr;
 
     return $crispr;
@@ -94,13 +81,7 @@ sub retrieve_destination_crispr_pair {
     my ( $self, $crispr_pair_id ) = @_;
     $self->log->debug( "Attempting to retrieve crispr_pair from destination DB" );
 
-    my $crispr_pair = try {
-        $self->dest_model->schema->resultset( 'CrisprPair' )->find( { 'id' => $crispr_pair_id } );
-    }
-    catch {
-        $_->throw() unless $_->not_found;
-        undef;
-    };
+    my $crispr_pair = $self->dest_model->schema->resultset( 'CrisprPair' )->find( { 'id' => $crispr_pair_id } );
     $self->log->info( "Crispr Pair already exists in the destination DB" ) if $crispr_pair;
 
     return $crispr_pair;

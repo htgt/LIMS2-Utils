@@ -27,15 +27,7 @@ sub retrieve_or_create_design {
     return if $self->retrieve_destination_design($design_id);
 
     try{
-        $self->dest_model->txn_do(
-            sub {
-                $self->create_destination_design( $design_id );
-                if ( !$self->persist ) {
-                    $self->log->debug('Rollback');
-                    $self->dest_model->txn_rollback;
-                }
-            }
-        );
+        $self->create_destination_design( $design_id );
     }
     catch {
         $self->log->error("Error creating design: $_");
@@ -50,13 +42,7 @@ sub retrieve_destination_design {
     my ( $self, $design_id ) = @_;
     $self->log->debug( "Attempting to retrieve design from destination DB" );
 
-    my $design = try {
-        $self->dest_model->schema->resultset( 'Design' )->find( { 'id' => $design_id } );
-    }
-    catch {
-        $_->throw() unless $_->not_found;
-        undef;
-    };
+    my $design = $self->dest_model->schema->resultset( 'Design' )->find( { 'id' => $design_id } );
     $self->log->info( "Design already exists in the destination DB" ) if $design;
 
     return $design;
@@ -115,7 +101,6 @@ sub build_design_data {
 
     return $design_data;
 }
-
 
 __PACKAGE__->meta->make_immutable;
 
