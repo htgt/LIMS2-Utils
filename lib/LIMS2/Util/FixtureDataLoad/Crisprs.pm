@@ -127,8 +127,12 @@ sub create_destination_crispr_pair {
     }
 
     $self->log->info('Create left and right crispr of crispr pair');
-    $self->_create_crispr( $crispr_pair->right_crispr );
-    $self->_create_crispr( $crispr_pair->left_crispr );
+    unless ( $self->retrieve_destination_crispr( $crispr_pair->right_crispr_id ) ) {
+        $self->_create_crispr( $crispr_pair->right_crispr );
+    }
+    unless ( $self->retrieve_destination_crispr( $crispr_pair->left_crispr_id ) ) {
+        $self->_create_crispr( $crispr_pair->left_crispr );
+    }
 
     $self->log->info( 'Copy crispr_pair' );
     my $crispr_pair_data = $self->get_dbix_row_data( $crispr_pair );
