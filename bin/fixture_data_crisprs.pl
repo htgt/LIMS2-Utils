@@ -26,16 +26,25 @@ LOGDIE('You must specify a crispr or crispr pair' ) if !$crispr_id && !$crispr_p
 my $crispr_loader = LIMS2::Util::FixtureDataLoad::Crisprs->new(
     source_db => 'LIMS2_LIVE',
     dest_db   => 'LIMS2_SP12',
-    persist   => $persist,
 );
 
-if ( $crispr_id ) {
-    $crispr_loader->retrieve_or_create_crispr( $crispr_id );
-}
+$design_loader->dest_model->txn_do(
+    sub {
+        if ( $crispr_id ) {
+            $crispr_loader->retrieve_or_create_crispr( $crispr_id );
+        }
 
-if ( $crispr_pair_id ) {
-    $crispr_loader->retrieve_or_create_crispr_pair( $crispr_pair_id );
-}
+        if ( $crispr_pair_id ) {
+            $crispr_loader->retrieve_or_create_crispr_pair( $crispr_pair_id );
+        }
+
+        if ( !$persist ) {
+            DEBUG('Rollback');
+            $design_loader->dest_model->txn_rollback;
+        }
+    }
+);
+
 
 __END__
 

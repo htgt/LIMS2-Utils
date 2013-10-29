@@ -25,10 +25,17 @@ LOGDIE('You must specify a design with --design' ) unless $design_id;
 my $design_loader = LIMS2::Util::FixtureDataLoad::Designs->new(
     source_db => 'LIMS2_LIVE',
     dest_db   => 'LIMS2_SP12',
-    persist   => $persist,
 );
 
-$design_loader->retrieve_or_create_design( $design_id );
+$design_loader->dest_model->txn_do(
+    sub {
+        $design_loader->retrieve_or_create_design( $design_id );
+        if ( !$persist ) {
+            DEBUG('Rollback');
+            $design_loader->dest_model->txn_rollback;
+        }
+    }
+);
 
 __END__
 
