@@ -207,6 +207,8 @@ sub dump_fixture_data {
 
     $self->log->error( "Error running psql command: $err" ) if $err;
 
+    $self->remove_empty_records;
+
     return;
 }
 
@@ -228,6 +230,32 @@ sub create_psql_command_file {
     }
 
     return $command_fh;
+}
+
+=head2 remove_empty_records
+
+Remove csv files that have no records ( just a header line )
+
+=cut
+sub remove_empty_records {
+    my ( $self ) = @_;
+
+    for my $file ( $self->dir->children ) {
+        my ( $count, $err ) = ( "", "" );
+        run( [ 'wc', '-l' ],
+            '<', $file->stringify,
+            '>', \$count,
+            '2>', \$err,
+        ) or die( "Failed to run psql command: $err" );
+        chomp( $count );
+
+        if ( $count <= 1 ) {
+            $self->log->debug( "Removing empty file $file " );
+            $file->remove;
+        }
+    }
+
+    return;
 }
 
 
