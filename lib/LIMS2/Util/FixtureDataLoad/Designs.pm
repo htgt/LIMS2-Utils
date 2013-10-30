@@ -20,9 +20,9 @@ extends qw( LIMS2::Util::FixtureDataLoad );
 
 sub retrieve_or_create_design {
     my ( $self, $design_id ) = @_;
-    Log::Log4perl::NDC->push( $design_id );
+    Log::Log4perl::NDC->push( "[design: $design_id]" );
 
-    $self->log->info( "Retrieve or create design $design_id" );
+    $self->log->info( "Retrieve or create design" );
 
     return if $self->retrieve_destination_design($design_id);
 
@@ -42,7 +42,7 @@ sub retrieve_destination_design {
     my ( $self, $design_id ) = @_;
     $self->log->debug( "Attempting to retrieve design from destination DB" );
 
-    my $design = $self->dest_model->schema->resultset( 'Design' )->find( { 'id' => $design_id } );
+    my $design = $self->dest_model->schema->resultset( 'Design' )->find( { id => $design_id } );
     $self->log->info( "Design already exists in the destination DB" ) if $design;
 
     return $design;
@@ -51,7 +51,7 @@ sub retrieve_destination_design {
 sub create_destination_design {
     my ( $self, $design_id ) = @_;
 
-    my $design = $self->source_model->schema->resultset( 'Design' )->find( { 'id' => $design_id } );
+    my $design = $self->source_model->schema->resultset( 'Design' )->find( { id => $design_id } );
     unless ( $design ) {
         $self->log->logdie( 'Could not retrieve design from source' );
     }

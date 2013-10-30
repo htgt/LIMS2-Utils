@@ -20,7 +20,7 @@ extends qw( LIMS2::Util::FixtureDataLoad );
 
 sub retrieve_or_create_crispr {
     my ( $self, $crispr_id ) = @_;
-    Log::Log4perl::NDC->push( $crispr_id );
+    Log::Log4perl::NDC->push( "[crispr: $crispr_id]" );
 
     $self->log->info( "Retrieve or create crispr" );
 
@@ -40,7 +40,7 @@ sub retrieve_or_create_crispr {
 
 sub retrieve_or_create_crispr_pair {
     my ( $self, $crispr_pair_id ) = @_;
-    Log::Log4perl::NDC->push( $crispr_pair_id );
+    Log::Log4perl::NDC->push( "crispr pair: $crispr_pair_id" );
 
     $self->log->info( "Retrieve or create crispr_pair" );
 
@@ -70,7 +70,7 @@ sub retrieve_destination_crispr {
     my ( $self, $crispr_id ) = @_;
     $self->log->debug( "Attempting to retrieve crispr from destination DB" );
 
-    my $crispr = $self->dest_model->schema->resultset( 'Crispr' )->find( { 'id' => $crispr_id } );
+    my $crispr = $self->dest_model->schema->resultset( 'Crispr' )->find( { id => $crispr_id } );
 
     $self->log->info( "Crispr already exists in the destination DB" ) if $crispr;
 
@@ -81,7 +81,7 @@ sub retrieve_destination_crispr_pair {
     my ( $self, $crispr_pair_id ) = @_;
     $self->log->debug( "Attempting to retrieve crispr_pair from destination DB" );
 
-    my $crispr_pair = $self->dest_model->schema->resultset( 'CrisprPair' )->find( { 'id' => $crispr_pair_id } );
+    my $crispr_pair = $self->dest_model->schema->resultset( 'CrisprPair' )->find( { id => $crispr_pair_id } );
     $self->log->info( "Crispr Pair already exists in the destination DB" ) if $crispr_pair;
 
     return $crispr_pair;
@@ -90,7 +90,7 @@ sub retrieve_destination_crispr_pair {
 sub create_destination_crispr {
     my ( $self, $crispr_id ) = @_;
 
-    my $crispr = $self->source_model->schema->resultset( 'Crispr' )->find( { 'id' => $crispr_id } );
+    my $crispr = $self->source_model->schema->resultset( 'Crispr' )->find( { id => $crispr_id } );
     unless ( $crispr ) {
         $self->log->logdie( 'Could not retrieve crispr from source' );
     }
@@ -102,7 +102,7 @@ sub create_destination_crispr {
 sub create_destination_crispr_pair {
     my ( $self, $crispr_pair_id ) = @_;
 
-    my $crispr_pair = $self->source_model->schema->resultset( 'CrisprPair' )->find( { 'id' => $crispr_pair_id } );
+    my $crispr_pair = $self->source_model->schema->resultset( 'CrisprPair' )->find( { id => $crispr_pair_id } );
     unless ( $crispr_pair ) {
         $self->log->logdie( 'Could not retrieve crispr_pair from source' );
     }

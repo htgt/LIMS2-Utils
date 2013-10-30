@@ -20,9 +20,9 @@ extends qw( LIMS2::Util::FixtureDataLoad );
 
 sub retrieve_or_create_bac {
     my ( $self, $bac_name ) = @_;
-    Log::Log4perl::NDC->push( $bac_name );
+    Log::Log4perl::NDC->push( "[bac: $bac_name]" );
 
-    $self->log->info( "Retrieve or create bac $bac_name" );
+    $self->log->info( "Retrieve or create bac" );
 
     return if $self->retrieve_destination_bac($bac_name);
 
