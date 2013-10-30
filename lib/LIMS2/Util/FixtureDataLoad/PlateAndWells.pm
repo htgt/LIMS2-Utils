@@ -17,6 +17,7 @@ use Try::Tiny;
 use Scalar::Util qw( blessed );
 use LIMS2::Util::FixtureDataLoad::Designs;
 use LIMS2::Util::FixtureDataLoad::Crisprs;
+use LIMS2::Util::FixtureDataLoad::Bacs;
 use namespace::autoclean;
 
 extends qw( LIMS2::Util::FixtureDataLoad );
@@ -77,6 +78,24 @@ sub _build_crispr_loader {
     return $crispr_loader;
 }
 
+has bac_loader => (
+    is         => 'ro',
+    isa        => 'LIMS2::Util::FixtureDataLoad::Bacs',
+    lazy_build => 1,
+    handles    => [ 'retrieve_or_create_bac' ],
+);
+
+sub _build_bac_loader {
+    my $self = shift;
+
+    my $bac_loader = LIMS2::Util::FixtureDataLoad::Bacs->new(
+        source_model => $self->source_model,
+        dest_model   => $self->dest_model,
+    );
+
+    return $bac_loader;
+}
+
 has process_aux_data_dispatches => (
     is         => 'ro',
     isa        => 'HashRef',
@@ -110,14 +129,12 @@ sub _build_process_aux_data_dispatches {
     return \%process_aux_data_dispatches;
 }
 
-
-
 sub copy_plate_to_destination_db {
     my ( $self, $plate_name, $well_name ) = @_;
     Log::Log4perl::NDC->push( $plate_name );
 
     my $source_plate = $self->source_model->schema->resultset('Plate')->find(
-        { name => $plate_name },
+        { name     => $plate_name },
         { prefetch => 'wells' }
     );
     $self->log->logdie( "Can not find plate in source database" ) unless $source_plate;
@@ -184,11 +201,14 @@ sub copy_well_to_destination_db {
 
     # If this is a create_di process, ensure the design exists before attempting to create the well
     if ( $well_orig_process_type eq 'create_di' ) {
-        my $design_id = $well_data->{ 'process_data' }{ 'design_id' };
+        my $design_id = $well_data->{process_data}{design_id};
         $self->retrieve_or_create_design( $design_id );
+
+        my @bac_names = map{ $_->{bac_name} } @{ $well_data->{process_data}{bacs} };
+        $self->retrieve_or_create_bac( $_ ) for @bac_names;
     }
     elsif ( $well_orig_process_type eq 'create_crispr' ) {
-        my $crispr_id = $well_data->{ 'process_data' }{ 'crispr_id' };
+        my $crispr_id = $well_data->{process_data}{crispr_id};
         $self->retrieve_or_create_crispr( $crispr_id );
     }
 
@@ -210,7 +230,7 @@ sub retrieve_destination_plate {
     $self->log->debug( 'Retrieving plate' );
 
     my $plate_dest = $self->dest_model->schema->resultset('Plate')->find(
-        { name => $source_plate->name },
+        { name     => $source_plate->name },
         { prefetch => 'wells' }
     );
 
@@ -251,7 +271,7 @@ sub retrieve_destination_well {
 
     my $well_dest = $plate->wells->find( { name => $well->name } );
 
-    $self->log->debug( "Well $well_dest already exists in the destination DB") if $well_dest;
+    $self->log->debug( "Well already exists in the destination DB") if $well_dest;
 
     return $well_dest;
 }
@@ -292,39 +312,46 @@ sub build_well_data {
     );
 
     if ( @parent_well_details ) {
-        $process_data { 'input_wells' } = \@parent_well_details;
+        $process_data{input_wells} = \@parent_well_details;
     }
 
     $self->log->debug("Setting up process data for process type $input_well_process_type" );
     $self->process_aux_data_dispatches->{ $input_well_process_type }->( $input_well, \%process_data );
-    $well_data{ 'process_data' } = \%process_data;
+    $well_data{process_data} = \%process_data;
 
     return \%well_data;
 }
 
 sub create_process_aux_data_create_di {
     my ( $self, $well, $process_data ) = @_;
-    $self->log->debug('create_di well ' . $well->name);
+    $self->log->debug('create_di well');
 
     my $process = $well->output_processes->first;
 
     if ( $process->process_design ) {
-        $process_data->{ 'design_id' } = $process->process_design->design_id;
+        $process_data->{design_id} = $process->process_design->design_id;
     }
 
-    #TODO put in bacs sp12 Fri 26 Jul 2013 13:28:27 BST
-    #$process_data { 'bacs' } = $well->bacs;
+    for my $process_bac ( $process->process_bacs->all ) {
+        my $bac_clone = $process_bac->bac_clone;
+        push @{ $process_data->{bacs} }, {
+            bac_plate   => $process_bac->bac_plate,
+            bac_name    => $bac_clone->name,
+            bac_library => $bac_clone->bac_library_id,
+        };
+    }
 
     return;
 }
 
 sub create_process_aux_data_create_crispr{
     my ( $self, $well, $process_data ) = @_;
+    $self->log->debug('create_crispr well');
 
     my $process = $well->output_processes->first;
 
     if ( $process->process_crispr ) {
-        $process_data->{ 'crispr_id' } = $process->process_crispr->crispr_id;
+        $process_data->{crispr_id} = $process->process_crispr->crispr_id;
     }
 
     return;
@@ -332,32 +359,32 @@ sub create_process_aux_data_create_crispr{
 
 sub create_process_aux_data_int_recom{
     my ( $self, $well, $process_data ) = @_;
-    $self->log->debug("int_recom Well $well");
+    $self->log->debug('int_recom well');
 
     my $process = $well->output_processes->first;
-    $process_data->{ 'cassette' } = $process->process_cassette->cassette->name;
-    $process_data->{ 'backbone' } = $process->process_backbone->backbone->name;
+    $process_data->{cassette} = $process->process_cassette->cassette->name;
+    $process_data->{backbone} = $process->process_backbone->backbone->name;
 
     return;
 }
 
 sub create_process_aux_data_2w_gateway{
     my ( $self, $well, $process_data ) = @_;
-    $self->log->debug("2w_gateway Well $well");
+    $self->log->debug('2w_gateway well');
 
     my $process = $well->output_processes->first;
 
     if ( my $process_cassette = $process->process_cassette ) {
-        $process_data->{ 'cassette' } = $process_cassette->cassette->name;
+        $process_data->{cassette} = $process_cassette->cassette->name;
     }
     if ( my $process_backbone = $process->process_backbone ) {
-        $process_data->{ 'backbone' } = $process_backbone->backbone->name;
+        $process_data->{backbone} = $process_backbone->backbone->name;
     }
 
     my @recombinases = $process->process_recombinases->search( {} , { order_by => 'rank' } );
 
-    if (@recombinases) {
-        $process_data->{ 'recombinase' } = [ map { $_->recombinase_id } @recombinases ];
+    if ( @recombinases ) {
+        $process_data->{recombinase} = [ map { $_->recombinase_id } @recombinases ];
     }
 
     return;
@@ -365,16 +392,16 @@ sub create_process_aux_data_2w_gateway{
 
 sub create_process_aux_data_3w_gateway{
     my ( $self, $well, $process_data ) = @_;
-    $self->log->debug("3w_gateway Well $well");
+    $self->log->debug('3w_gateway well');
 
     my $process = $well->output_processes->first;
-    $process_data->{ 'cassette' } = $process->process_cassette->cassette->name;
-    $process_data->{ 'backbone' } = $process->process_backbone->backbone->name;
+    $process_data->{cassette} = $process->process_cassette->cassette->name;
+    $process_data->{backbone} = $process->process_backbone->backbone->name;
 
     my @recombinases = $process->process_recombinases->search( {} , { order_by => 'rank' } );
 
-    if (@recombinases) {
-        $process_data->{ 'recombinase' } = [ map { $_->recombinase_id } @recombinases ];
+    if ( @recombinases ) {
+        $process_data->{recombinase} = [ map { $_->recombinase_id } @recombinases ];
     }
 
     return;
@@ -382,20 +409,20 @@ sub create_process_aux_data_3w_gateway{
 
 sub create_process_aux_data_legacy_gateway {
     my ( $self, $well, $process_data ) = @_;
-    $self->log->debug("legacy_gateway Well $well");
+    $self->log->debug('legacy_gateway well');
 
     my $process = $well->output_processes->first;
     if ( my $process_cassette = $process->process_cassette ) {
-        $process_data->{ 'cassette' } = $process_cassette->cassette->name;
+        $process_data->{cassette} = $process_cassette->cassette->name;
     }
     if ( my $process_backbone = $process->process_backbone ) {
-        $process_data->{ 'backbone' } = $process_backbone->backbone->name;
+        $process_data->{backbone} = $process_backbone->backbone->name;
     }
 
     my @recombinases = $process->process_recombinases->search( {} , { order_by => 'rank' } );
 
-    if (@recombinases) {
-        $process_data->{ 'recombinase' } = [ map { $_->recombinase_id } @recombinases ];
+    if ( @recombinases ) {
+        $process_data->{recombinase} = [ map { $_->recombinase_id } @recombinases ];
     }
 
     return;
@@ -410,14 +437,14 @@ sub create_process_aux_data_final_pick{
 
 sub create_process_aux_data_recombinase{
     my ( $self, $well, $process_data ) = @_;
-    $self->log->debug("recombinase Well $well");
+    $self->log->debug('recombinase well');
 
     my $process = $well->output_processes->first;
 
     my @recombinases = $process->process_recombinases->search( {} , { order_by => 'rank' } );
 
-    if (@recombinases) {
-        $process_data->{ 'recombinase' } = [ map { $_->recombinase_id } @recombinases ];
+    if ( @recombinases ) {
+        $process_data->{recombinase} = [ map { $_->recombinase_id } @recombinases ];
     }
 
     return;
@@ -460,13 +487,13 @@ sub create_process_aux_data_clone_pool{
 
 sub create_process_aux_data_first_electroporation{
     my ( $self, $well, $process_data ) = @_;
-    $self->log->debug("first_electroporation Well $well");
+    $self->log->debug('first_electroporation well');
 
     my $cell_line = $well->first_cell_line;
     $self->log->debug('FEP cell line : ' . $cell_line->name) if $cell_line;;
     $self->log->logdie("No first_cell_line set for $well") unless $cell_line;
 
-    $process_data->{ 'cell_line' } = $cell_line->name;
+    $process_data->{cell_line} = $cell_line->name;
 
     return;
 }
