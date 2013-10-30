@@ -51,7 +51,7 @@ sub BUILD {
         local $ENV{ LIMS2_DB } = $self->dest_db;
         # connect as tests user to make sure we are writing to a test database
         my $dest_schema = LIMS2::Model::DBConnect->connect( 'LIMS2_DB', 'tests' );
-        my $dest_model = LIMS2::Model->new( user => 'lims2', schema => $dest_schema );
+        my $dest_model = LIMS2::Model->new( user => 'tests', schema => $dest_schema );
         $self->dest_model( $dest_model );
     }
 
