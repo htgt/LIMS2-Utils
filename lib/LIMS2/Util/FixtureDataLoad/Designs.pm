@@ -69,9 +69,7 @@ sub build_design_data {
 
     # fetch data as hash from existing design object
     my $design_data = $design->as_hash( 0 );
-
-    # create user if they do not already exist
-    $self->create_user( $design->created_by );
+    $design_data->{created_by} = 'test_user@example.org';
 
     # create gene_design data
     my @genes;
@@ -79,8 +77,8 @@ sub build_design_data {
         push @genes, {
             gene_id      => $g->gene_id,
             gene_type_id => $g->gene_type_id,
+            created_by   => 'test_user@example.org',
         };
-        $self->create_user( $g->created_by );
     }
     $design_data->{gene_ids} = \@genes;
 

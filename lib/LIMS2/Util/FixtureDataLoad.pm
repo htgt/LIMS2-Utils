@@ -70,16 +70,6 @@ sub BUILD {
     }
 }
 
-sub create_user {
-    my ( $self, $user ) = @_;
-
-    $self->dest_model->schema->resultset('User')->find_or_create(
-        { $user->get_columns }
-    );
-
-    return;
-}
-
 sub get_dbix_row_data {
     my ( $self, $row ) = @_;
 
