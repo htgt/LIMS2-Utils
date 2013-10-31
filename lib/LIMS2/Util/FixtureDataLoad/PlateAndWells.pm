@@ -213,7 +213,7 @@ sub copy_well_to_destination_db {
     }
 
     $self->log->info( "Process $well_orig_process_type, plate type $well_orig_plate_type");
-    $well_orig = $self->create_well_in_destination_db( $well_data );
+    $well_orig = $self->create_well_in_destination_db( $well_orig, $well_data );
 
     return $well_orig;
 }
@@ -222,7 +222,7 @@ sub retrieve_or_create_plate {
     my ( $self, $plate ) = @_;
     Log::Log4perl::NDC->remove();
     Log::Log4perl::NDC->push( $plate->name );
-    return $self->retrieve_destination_plate( $plate ) || $self->create_destination_plate( $self->build_plate_data( $plate ) );
+    return $self->retrieve_destination_plate( $plate ) || $self->create_destination_plate( $plate, $self->build_plate_data( $plate ) );
 }
 
 sub retrieve_destination_plate {
@@ -247,7 +247,7 @@ sub build_plate_data {
         name        => $plate->name,
         type        => $plate->type_id,
         description => $plate->description,
-        created_by  => 'test_user@example.org',
+        created_by  => $plate->created_by->name,
         species     => $plate->species_id,
         is_virtual  => $plate->is_virtual ? 1 : 0,
     );
@@ -256,11 +256,12 @@ sub build_plate_data {
 }
 
 sub create_destination_plate {
-    my ( $self, $plate_data ) = @_;
+    my ( $self, $plate, $plate_data ) = @_;
 
     $self->log->info( "Attempting to create plate, type $plate_data->{type}");
 
     #TODO plate comments sp12 Tue 29 Oct 2013 09:07:25 GMT
+    $self->find_or_create_user( $plate->created_by );
     my $plate_dest = $self->dest_model->create_plate( $plate_data );
 
     return $plate_dest;
@@ -277,9 +278,10 @@ sub retrieve_destination_well {
 }
 
 sub create_well_in_destination_db {
-    my ( $self, $well_data ) = @_;
+    my ( $self, $well, $well_data ) = @_;
 
     $self->log->info( "Creating well process type $well_data->{process_data}{type}" );
+    $self->find_or_create_user( $well->created_by );
     my $well_dest = $self->dest_model->create_well( $well_data );
 
     return $well_dest;
@@ -293,7 +295,7 @@ sub build_well_data {
     my %well_data = (
         plate_name => $plate->name,
         well_name  => $input_well->name,
-        created_by => 'test_user@example.org',
+        created_by => $input_well->created_by->name,
     );
 
     # fetch details from parent wells for process data
