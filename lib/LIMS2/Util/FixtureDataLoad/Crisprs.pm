@@ -47,15 +47,7 @@ sub retrieve_or_create_crispr_pair {
     return if $self->retrieve_destination_crispr_pair($crispr_pair_id);
 
     try{
-        $self->dest_model->txn_do(
-            sub {
-                $self->create_destination_crispr_pair( $crispr_pair_id );
-                if ( !$self->persist ) {
-                    $self->log->debug('Rollback');
-                    $self->dest_model->txn_rollback;
-                }
-            }
-        );
+        $self->create_destination_crispr_pair( $crispr_pair_id );
     }
     catch {
         $self->log->error("Error creating crispr_pair: $_");
