@@ -57,6 +57,8 @@ sub create_destination_design {
     }
     my $design_data = $self->build_design_data( $design );
 
+    $self->find_or_create_user( $design->created_by );
+
     $self->dest_model->create_design( $design_data );
     $self->log->info( "Design created" );
 
@@ -69,7 +71,6 @@ sub build_design_data {
 
     # fetch data as hash from existing design object
     my $design_data = $design->as_hash( 0 );
-    $design_data->{created_by} = 'test_user@example.org';
 
     # create gene_design data
     my @genes;
@@ -77,7 +78,6 @@ sub build_design_data {
         push @genes, {
             gene_id      => $g->gene_id,
             gene_type_id => $g->gene_type_id,
-            created_by   => 'test_user@example.org',
         };
     }
     $design_data->{gene_ids} = \@genes;
