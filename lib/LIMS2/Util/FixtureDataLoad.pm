@@ -68,6 +68,8 @@ sub BUILD {
         my $source_model = LIMS2::Model->new( user => 'lims2', schema => $source_schema );
         $self->source_model( $source_model );
     }
+
+    return;
 }
 
 sub find_or_create_user {

@@ -137,7 +137,9 @@ sub _create_crispr {
     $self->log->debug( 'Copy crispr loci data' );
     for my $locus ( $crispr->loci->all ) {
         my $datum = $self->get_dbix_row_data( $locus );
+        ## no critic(ProtectPrivateSubs)
         my $chr_id = $self->dest_model->_chr_id_for( $datum->{assembly_id}, $locus->chr->name );
+        ## use critic
         $datum->{chr_id} = $chr_id;
         $self->dest_model->schema->resultset('CrisprLocus')->create( $datum  );
     }
