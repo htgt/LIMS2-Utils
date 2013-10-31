@@ -7,24 +7,28 @@ use Log::Log4perl ':easy';
 use Pod::Usage;
 use LIMS2::Util::FixtureDataLoad::Designs;
 
-my $log_level = $DEBUG;
+my $log_level = $INFO;
 my $persist = 0;
+my $source_db;
 GetOptions(
-    'help'     => sub { pod2usage( -verbose    => 1 ) },
-    'man'      => sub { pod2usage( -verbose    => 2 ) },
-    'debug'    => sub { $log_level = $DEBUG },
-    'verbose'  => sub { $log_level = $INFO },
-    'persist'  => \$persist,
-    'design=i' => \my $design_id,
+    'help'        => sub { pod2usage( -verbose    => 1 ) },
+    'man'         => sub { pod2usage( -verbose    => 2 ) },
+    'debug'       => sub { $log_level = $DEBUG },
+    'persist'     => \$persist,
+    'design=i'    => \my $design_id,
+    'source-db=s' => \$source_db,
+    'dest-db=s'   => \my $dest_db,
 ) or pod2usage(2);
 
 Log::Log4perl->easy_init( { level => $log_level, layout => '%p %x %m%n' } );
 
 LOGDIE('You must specify a design with --design' ) unless $design_id;
+LOGDIE('You must specify a destination database --dest-db' ) if !$dest_db;
+$source_db ||= 'LIMS2_LIVE';
 
 my $design_loader = LIMS2::Util::FixtureDataLoad::Designs->new(
-    source_db => 'LIMS2_LIVE',
-    dest_db   => 'LIMS2_SP12',
+    source_db => $source_db,
+    dest_db   => $dest_db,
 );
 
 $design_loader->dest_model->txn_do(
@@ -50,9 +54,10 @@ fixture_data_designs.pl - load one design from one database to another.
       --help            Display a brief help message
       --man             Display the manual page
       --debug           Debug output
-      --verbose         Verbose output
       --persist         Commit the new data, default is to rollback
       --design          Design ID of design you wish to transfer
+      --source-db       Name of source database, defaults to LIMS2_LIVE
+      --dest-db         Name of destination database.
 
 =head1 DESCRIPTION
 

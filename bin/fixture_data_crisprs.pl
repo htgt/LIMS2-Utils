@@ -7,28 +7,32 @@ use Log::Log4perl ':easy';
 use Pod::Usage;
 use LIMS2::Util::FixtureDataLoad::Crisprs;
 
-my $log_level = $DEBUG;
+my $log_level = $INFO;
 my $persist = 0;
+my $source_db;
 GetOptions(
     'help'          => sub { pod2usage( -verbose    => 1 ) },
     'man'           => sub { pod2usage( -verbose    => 2 ) },
     'debug'         => sub { $log_level = $DEBUG },
-    'verbose'       => sub { $log_level = $INFO },
     'persist'       => \$persist,
     'crispr=i'      => \my $crispr_id,
     'crispr_pair=i' => \my $crispr_pair_id,
+    'source-db=s'   => \$source_db,
+    'dest-db=s'     => \my $dest_db,
 ) or pod2usage(2);
 
 Log::Log4perl->easy_init( { level => $log_level, layout => '%p %x %m%n' } );
 
 LOGDIE('You must specify a crispr or crispr pair' ) if !$crispr_id && !$crispr_pair_id;
+LOGDIE('You must specify a destination database --dest-db' ) if !$dest_db;
+$source_db ||= 'LIMS2_LIVE';
 
 my $crispr_loader = LIMS2::Util::FixtureDataLoad::Crisprs->new(
-    source_db => 'LIMS2_LIVE',
-    dest_db   => 'LIMS2_SP12',
+    source_db => $source_db,
+    dest_db   => $dest_db,
 );
 
-$design_loader->dest_model->txn_do(
+$crispr_loader->dest_model->txn_do(
     sub {
         if ( $crispr_id ) {
             $crispr_loader->retrieve_or_create_crispr( $crispr_id );
@@ -40,7 +44,7 @@ $design_loader->dest_model->txn_do(
 
         if ( !$persist ) {
             DEBUG('Rollback');
-            $design_loader->dest_model->txn_rollback;
+            $crispr_loader->dest_model->txn_rollback;
         }
     }
 );
@@ -59,10 +63,11 @@ fixture_data_crisprs.pl - load one crispr from one database to another.
       --help            Display a brief help message
       --man             Display the manual page
       --debug           Debug output
-      --verbose         Verbose output
       --persist         Commit the new data, default is to rollback
       --crispr          Crispr ID of crispr you wish to transfer
       --crispr_pair     Crispr Pair ID of crispr_pair you wish to transfer
+      --source-db       Name of source database, defaults to LIMS2_LIVE
+      --dest-db         Name of destination database.
 
 =head1 DESCRIPTION
 
