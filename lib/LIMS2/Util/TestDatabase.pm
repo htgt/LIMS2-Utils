@@ -118,6 +118,8 @@ crispr_off_targets
 crispr_off_target_summaries
 crispr_loci
 crisprs
+crispr_pairs
+crispr_designs
 qc_alignment_regions
 qc_alignments
 qc_test_results
