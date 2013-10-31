@@ -70,6 +70,30 @@ sub BUILD {
     }
 }
 
+sub find_or_create_user {
+    my ( $self, $user ) = @_;
+
+    my $dest_user = $self->dest_model->schema->resultset( 'User' )->find(
+        {
+            name => $user->name,
+        }
+    );
+
+    unless ( $dest_user ) {
+        $dest_user = $self->dest_model->schema->resultset( 'User' )->create(
+            {
+                name => $user->name,
+            }
+        );
+        # the lims2 model caches the check_param methods for speed but this
+        # means newly created users are not seen by the existing_user check
+        # we need to clear the cached version of this checking subroutine
+        $self->dest_model->clear_cached_constraint_method( 'existing_user' );
+    }
+
+    return;
+}
+
 sub get_dbix_row_data {
     my ( $self, $row ) = @_;
 
