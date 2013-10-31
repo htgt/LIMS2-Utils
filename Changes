@@ -1,5 +1,8 @@
 {{$NEXT}}
 
+0.021     2013-10-25 15:27:45 Europe/London
+	Modified Tarmits feed to add additional force updates and to handle Dre and non-Dre clones.
+
 0.020     2013-08-28 10:39:23 Europe/London
 
     Updated Errbit module to automatically skip errors that aren't exceptions
