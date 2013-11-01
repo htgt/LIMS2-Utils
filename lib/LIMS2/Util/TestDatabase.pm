@@ -14,7 +14,7 @@ Useful tasks to carry out on test database
 
 use Moose;
 use LIMS2::Model;
-use LIMS2::Test qw( wipe_test_data load_static_files );
+use LIMS2::Test qw( wipe_test_data load_static_files load_dynamic_files );
 use Config::Any;
 use LIMS2::Model::DBConnect;
 use Path::Class;
@@ -42,7 +42,7 @@ has model => (
 );
 
 has dir => (
-    is       => 'ro',
+    is       => 'rw',
     isa      => 'Path::Class::Dir',
     coerce   => 1,
     trigger  => \&_init_output_dir
@@ -171,6 +171,30 @@ sub setup_clean_database {
 
     return;
 }
+
+=head2 class_specific_fixture_data
+
+Load up a fresh set of class specific fixture data
+
+=cut
+sub class_specific_fixture_data {
+    my ( $self, $class_name ) = @_;
+
+    $self->log->info( 'Wiping data from database: ' . $self->db_name );
+    wipe_test_data( $self->model );
+    $self->log->info( 'Loading reference data into: ' . $self->db_name );
+    load_static_files( $self->model );
+
+    my $class_dir;
+    ( $class_dir = $class_name ) =~ s/::/\//g;
+    $class_dir =~ s/LIMS2\//LIMS2\/t\//;
+    my $fixture_dir= '/static/test/fixtures/' . $class_dir;
+    $self->log->info( "Loading class fixture data: $fixture_dir" );
+    load_dynamic_files( $self->model, undef, $fixture_dir );
+
+    return;
+}
+
 
 =head2 dump_fixture_data
 
