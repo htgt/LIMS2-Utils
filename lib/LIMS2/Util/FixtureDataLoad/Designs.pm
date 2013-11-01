@@ -58,6 +58,10 @@ sub create_destination_design {
     my $design_data = $self->build_design_data( $design );
 
     $self->find_or_create_user( $design->created_by );
+    # need to find or create user "unknown" because that is for some reason
+    # the user who is hard coded to create the design oligos
+    my $unknown_user = $self->source_model->schema->resultset( 'User' )->find( { name => 'unknown' } );
+    $self->find_or_create_user( $unknown_user  );
 
     $self->dest_model->create_design( $design_data );
     $self->log->info( "Design created" );
