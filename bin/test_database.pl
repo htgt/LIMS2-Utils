@@ -14,30 +14,36 @@ GetOptions(
     'man'      => sub { pod2usage( -verbose    => 2 ) },
     'debug'    => sub { $log_level = $DEBUG },
     'db=s'     => \my $db_name,
-    'dir=s'    => \my $dir_name,
+    'dump=s'   => \my $dump_dir,
     'clean'    => \my $clean,
+    'class=s'  => \my $class,
 ) or pod2usage(2);
 
 Log::Log4perl->easy_init( { level => $log_level, layout => '%p %m%n' } );
 
 LOGDIE('You must specify a db name with --db' ) unless $db_name;
 
-if ( $clean ) {
-    my $test_database = LIMS2::Util::TestDatabase->new( db_name => $db_name );
+LOGDIE( 'You must specify one of --class, --clean or --dump' ) if !$dump_dir && !$clean && !$class;
+my $test_database = LIMS2::Util::TestDatabase->new( db_name => $db_name );
 
+if ( $clean ) {
     $test_database->model->txn_do(
         sub {
             $test_database->setup_clean_database;
         }
     );
 }
-else {
-    LOGDIE('You must specify a directory name with --dir' ) unless $dir_name;
 
-    my $test_database = LIMS2::Util::TestDatabase->new(
-        db_name => $db_name,
-        dir     => $dir_name,
+if ( $class ) {
+    $test_database->model->txn_do(
+        sub {
+            $test_database->class_specific_fixture_data( $class );
+        }
     );
+}
+
+if ( $dump_dir ) {
+    $test_database->dir( $dump_dir );
 
     $test_database->dump_fixture_data;
 }
@@ -57,17 +63,22 @@ test_database.pl - setup of test database and dumping of test data
       --man             Display the manual page
       --debug           Debug output
       --db              Name of test database
-      --dir             Name of dir test data will be dumped to
       --clean           Run clean script to have only reference data into database
+      --class           Specify class fixture data you want to load into database
+      --dump            Name of directory test data will be dumped to
+
 
 =head1 DESCRIPTION
 
-Interface to 2 actions that can be carried out on a test database.
-
-Dump data from all non reference tables into csv files.
+Interface for actions that can be carried out on a test database.
 
 The clean option wipes all the non reference data from the test database and checks
 the reference data is up to date.
+
+The dump option dumps data from all non reference tables into csv files in the specified
+directory.
+
+The class option loads up the specified classes fixture data into the database.
 
 =head1 BUGS
 
