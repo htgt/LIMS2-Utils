@@ -53,11 +53,11 @@ __END__
 
 =head1 NAME
 
-test_database.pl - setup of test database and dumping of test data
+fixture_data_helper.pl - setup of test database and dumping of test data
 
 =head1 SYNOPSIS
 
-  test_database.pl [options]
+  fixture_data_helper.pl [options]
 
       --help            Display a brief help message
       --man             Display the manual page
