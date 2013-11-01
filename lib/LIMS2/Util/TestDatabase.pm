@@ -91,69 +91,69 @@ sub _build_db_config {
     return $config_data->{ $self->db_name };
 }
 
-const my @TABLE_NAMES => qw(
-well_dna_status
-well_dna_quality
-well_recombineering_results
-well_qc_sequencing_result
-process_bac
-process_recombinase
-process_output_well
-process_input_well
-process_design
-process_crispr
-process_cassette
-process_backbone
-process_cell_line
-processes
-genotyping_primers
-design_comments
-design_oligo_loci
-design_oligos
-gene_design
-designs
-bac_clone_loci
-bac_clones
-crispr_off_targets
-crispr_off_target_summaries
-crispr_loci
-crisprs
-crispr_pairs
-crispr_designs
-qc_alignment_regions
-qc_alignments
-qc_test_results
-qc_run_seq_project
-qc_run_seq_well_qc_seq_read
-qc_seq_reads
-qc_run_seq_wells
-qc_seq_projects
-qc_runs
-qc_template_well_cassette
-qc_template_well_backbone
-qc_template_well_recombinase
-qc_template_wells
-qc_templates
-qc_eng_seqs
-well_accepted_override
-well_comments
-well_chromosome_fail
-well_targeting_pass
-well_targeting_puro_pass
-well_genotyping_results
-well_recombineering_results
-well_colony_counts
-well_primer_bands
-well_lab_number
-wells
-plate_comments
-plates
-project_alleles
-projects
-user_preferences
-user_role
-users
-summaries
+const my %TABLE_NAMES => (
+well_dna_status              => 'WellDnaStatus',
+well_dna_quality             => 'WellDnaQuality',
+well_recombineering_results  => 'WellRecombineeringResults',
+well_qc_sequencing_result    => 'WellQcSequencingResult',
+process_bac                  => 'ProcessBac',
+process_recombinase          => 'ProcessRecombinase',
+process_output_well          => 'ProcessOutputWell',
+process_input_well           => 'ProcessInputWell',
+process_design               => 'ProcessDesign',
+process_crispr               => 'ProcessCrispr',
+process_cassette             => 'ProcessCassette',
+process_backbone             => 'ProcessBackbone',
+process_cell_line            => 'ProcessCellLine',
+processes                    => 'Process',
+genotyping_primers           => 'GenotypingPrimer',
+design_comments              => 'DesignComment',
+design_oligo_loci            => 'DesignOligoLocus',
+design_oligos                => 'DesignOligo',
+gene_design                  => 'GeneDesign',
+designs                      => 'Design',
+bac_clone_loci               => 'BacCloneLocus',
+bac_clones                   => 'BacClone',
+crispr_off_targets           => 'CrisprOffTargets',
+crispr_off_target_summaries  => 'CrisprOffTargetSummaries',
+crispr_loci                  => 'CrisprLocus',
+crisprs                      => 'Crispr',
+crispr_pairs                 => 'CrisprPair',
+crispr_designs               => 'CrisprDesign',
+qc_alignment_regions         => 'QcAlignmentRegion',
+qc_alignments                => 'QcAlignment',
+qc_test_results              => 'QcTestResult',
+qc_run_seq_project           => 'QcRunSeqProject',
+qc_run_seq_well_qc_seq_read  => 'QcRunSeqWellQcSeqRead',
+qc_seq_reads                 => 'QcSeqRead',
+qc_run_seq_wells             => 'QcRunSeqWell',
+qc_seq_projects              => 'QcSeqProject',
+qc_runs                      => 'QcRun',
+qc_template_well_cassette    => 'QcTemplateWellCassette',
+qc_template_well_backbone    => 'QcTemplateWellBackbone',
+qc_template_well_recombinase => 'QcTemplateWellRecombinase',
+qc_template_wells            => 'QcTemplateWell',
+qc_templates                 => 'QcTemplate',
+qc_eng_seqs                  => 'QcEngSeq',
+well_accepted_override       => 'WellAcceptedOverride',
+well_comments                => 'WellComment',
+well_chromosome_fail         => 'WellChromosomeFail',
+well_targeting_pass          => 'WellTargetingPass',
+well_targeting_puro_pass     => 'WellTargetingPuroPass',
+well_genotyping_results      => 'WellGenotypingResult',
+well_recombineering_results  => 'WellRecombineeringResult',
+well_colony_counts           => 'WellColonyCount',
+well_primer_bands            => 'WellPrimerBand',
+well_lab_number              => 'wellLabNumber',
+wells                        => 'Well',
+plate_comments               => 'PlateComment',
+plates                       => 'Plate',
+project_alleles              => 'ProjectAllele',
+projects                     => 'Project',
+user_preferences             => 'UserPreference',
+user_role                    => 'UserRole',
+users                        => 'User',
+summaries                    => 'Summary',
 );
 
 =head2 setup_clean_database
@@ -226,8 +226,9 @@ sub create_psql_command_file {
     my $dirname = $self->dir->stringify;
     my $command_fh = File::Temp->new( DIR => $dirname );
 
-    for my $table_name ( @TABLE_NAMES ) {
-        my $filename = $dirname . '/' . $table_name . '.csv';
+    for my $table_name ( keys %TABLE_NAMES ) {
+        my $resultset_name = $TABLE_NAMES{ $table_name };
+        my $filename = $dirname . '/' . $resultset_name . '.csv';
         $command_fh->print( "\\copy $table_name to '$filename' ( format csv, header 1 );\n" );
     }
 
