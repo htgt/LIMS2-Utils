@@ -5,7 +5,6 @@ author:
 build_requires:
   English: 0
   File::Find: 0
-  File::Temp: 0
   Test::More: 0.88
   Test::Most: 0
 configure_requires:
@@ -22,9 +21,11 @@ requires:
   Bio::Perl: 0
   Carp: 0
   Class::Data::Inheritable: 0
+  Config::Any: 0
   Const::Fast: 0
   Data::Dumper: 0
   EngSeqBuilder: 0
+  File::Temp: 0
   File::Which: 0
   Getopt::Long: 0
   HTTP::Request: 0
@@ -36,8 +37,10 @@ requires:
   JSON: 0
   LIMS2::Exception: 0
   LIMS2::Model: 0
+  LIMS2::Model::DBConnect: 0
   LIMS2::Model::Util::DesignInfo: 0
   LIMS2::Model::Util::EngSeqParams: 0
+  LIMS2::Test: 0
   LWP::UserAgent: 0
   List::MoreUtils: 0
   Log::Log4perl: 0
@@ -50,6 +53,7 @@ requires:
   MooseX::Types::Path::Class::MoreCoercions: 0
   MooseX::Types::URI: 0
   Path::Class: 0
+  Pod::Usage: 0
   Readonly: 0
   Scalar::Util: 0
   Sub::Exporter: 0
@@ -62,4 +66,4 @@ requires:
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.021
+version: 0.022

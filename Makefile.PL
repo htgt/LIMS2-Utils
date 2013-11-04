@@ -14,7 +14,6 @@ my %WriteMakefileArgs = (
   "BUILD_REQUIRES" => {
     "English" => 0,
     "File::Find" => 0,
-    "File::Temp" => 0,
     "Test::More" => "0.88",
     "Test::Most" => 0
   },
@@ -23,7 +22,12 @@ my %WriteMakefileArgs = (
   },
   "DISTNAME" => "LIMS2-Util",
   "EXE_FILES" => [
-    "bin/tarmits_feed_wrapper.pl"
+    "bin/tarmits_feed_wrapper.pl",
+    "bin/fixture_data_bacs.pl",
+    "bin/fixture_data_crisprs.pl",
+    "bin/fixture_data_designs.pl",
+    "bin/fixture_data_helper.pl",
+    "bin/fixture_data_plate_wells.pl"
   ],
   "LICENSE" => "perl",
   "NAME" => "LIMS2::Util",
@@ -32,9 +36,11 @@ my %WriteMakefileArgs = (
     "Bio::Perl" => 0,
     "Carp" => 0,
     "Class::Data::Inheritable" => 0,
+    "Config::Any" => 0,
     "Const::Fast" => 0,
     "Data::Dumper" => 0,
     "EngSeqBuilder" => 0,
+    "File::Temp" => 0,
     "File::Which" => 0,
     "Getopt::Long" => 0,
     "HTTP::Request" => 0,
@@ -46,8 +52,10 @@ my %WriteMakefileArgs = (
     "JSON" => 0,
     "LIMS2::Exception" => 0,
     "LIMS2::Model" => 0,
+    "LIMS2::Model::DBConnect" => 0,
     "LIMS2::Model::Util::DesignInfo" => 0,
     "LIMS2::Model::Util::EngSeqParams" => 0,
+    "LIMS2::Test" => 0,
     "LWP::UserAgent" => 0,
     "List::MoreUtils" => 0,
     "Log::Log4perl" => 0,
@@ -60,6 +68,7 @@ my %WriteMakefileArgs = (
     "MooseX::Types::Path::Class::MoreCoercions" => 0,
     "MooseX::Types::URI" => 0,
     "Path::Class" => 0,
+    "Pod::Usage" => 0,
     "Readonly" => 0,
     "Scalar::Util" => 0,
     "Sub::Exporter" => 0,
@@ -73,7 +82,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.021",
+  "VERSION" => "0.022",
   "test" => {
     "TESTS" => "t/*.t"
   }
