@@ -1,7 +1,7 @@
 package LIMS2::Util::TestDatabase;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::TestDatabase::VERSION = '0.022';
+    $LIMS2::Util::TestDatabase::VERSION = '0.023';
 }
 ## use critic
 
@@ -20,7 +20,7 @@ Useful tasks to carry out on test database
 
 use Moose;
 use LIMS2::Model;
-use LIMS2::Test qw( wipe_test_data load_static_files load_dynamic_files );
+use LIMS2::Test qw( wipe_test_data load_static_files load_dynamic_files mech );
 use Config::Any;
 use LIMS2::Model::DBConnect;
 use Path::Class;
@@ -71,6 +71,18 @@ sub _build_model {
     my $model = LIMS2::Model->new( user => 'tests', schema => $schema );
 
     return $model;
+}
+
+has test_mech => (
+    is         => 'ro',
+    isa        => 'Test::WWW::Mechanize::Catalyst',
+    lazy_build => 1,
+);
+
+sub _build_test_mech {
+    my $self = shift;
+
+    return mech( $self->model );
 }
 
 has db_config => (
@@ -171,9 +183,9 @@ sub setup_clean_database {
     my ( $self ) = @_;
 
     $self->log->info( 'Wiping data from database: ' . $self->db_name );
-    wipe_test_data( $self->model );
+    wipe_test_data( $self->model, $self->test_mech );
     $self->log->info( 'Loading reference data into: ' . $self->db_name );
-    load_static_files( $self->model );
+    load_static_files( $self->model, $self->test_mech );
 
     return;
 }
@@ -187,20 +199,19 @@ sub class_specific_fixture_data {
     my ( $self, $class_name ) = @_;
 
     $self->log->info( 'Wiping data from database: ' . $self->db_name );
-    wipe_test_data( $self->model );
+    wipe_test_data( $self->model, $self->test_mech );
     $self->log->info( 'Loading reference data into: ' . $self->db_name );
-    load_static_files( $self->model );
+    load_static_files( $self->model, $self->test_mech );
 
     my $class_dir;
     ( $class_dir = $class_name ) =~ s/::/\//g;
     $class_dir =~ s/LIMS2\//LIMS2\/t\//;
     my $fixture_dir= '/static/test/fixtures/' . $class_dir;
     $self->log->info( "Loading class fixture data: $fixture_dir" );
-    load_dynamic_files( $self->model, undef, $fixture_dir );
+    load_dynamic_files( $self->model, $self->test_mech, $fixture_dir );
 
     return;
 }
-
 
 =head2 dump_fixture_data
 
