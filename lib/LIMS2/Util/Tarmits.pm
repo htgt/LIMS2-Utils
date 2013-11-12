@@ -1,7 +1,7 @@
 package LIMS2::Util::Tarmits;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::Tarmits::VERSION = '0.023';
+    $LIMS2::Util::Tarmits::VERSION = '0.024';
 }
 ## use critic
 
@@ -91,9 +91,16 @@ sub _build_ua {
 #   Private methods
 #
 sub uri_for {
-    my ( $self, $path, $params ) = @_;
+    my ( $self, $path, $params, $targ_rep ) = @_;
+    my $uri;
 
-    my $uri = URI->new_abs( $path, $self->base_url );
+    if ( $targ_rep ) {
+        $uri = URI->new_abs( 'targ_rep/' . $path, $self->base_url );
+    }
+    else {
+        $uri = URI->new_abs( $path, $self->base_url );
+    }
+
     if ($params) {
         $uri->query_form($params);
     }
@@ -102,16 +109,16 @@ sub uri_for {
 }
 
 sub request {
-    my ( $self, $method, $rel_url, $data ) = @_;
+    my ( $self, $method, $rel_url, $data, $targ_rep ) = @_;
 
     my ( $uri, $request );
 
     if ( $method eq 'GET' or $method eq 'DELETE' ) {
-        $uri = $self->uri_for( $rel_url, $data );
+        $uri = $self->uri_for( $rel_url, $data, $targ_rep );
         $request = HTTP::Request->new( $method, $uri, [ content_type => 'application/json' ] );
     }
     elsif ( $method eq 'PUT' or $method eq 'POST' ) {
-        $uri = $self->uri_for($rel_url);
+        $uri = $self->uri_for($rel_url, undef, $targ_rep );
         $request = HTTP::Request->new( $method, $uri, [ content_type => 'application/json' ], to_json($data) );
     }
     else {
@@ -139,38 +146,46 @@ sub request {
 
 {
     my $meta = __PACKAGE__->meta;
+    my $targ_rep = 1;
 
     foreach my $key ( qw( allele targeting_vector es_cell genbank_file distribution_qc ) ) {
         $meta->add_method(
             "find_$key" => sub {
                 my ( $self, $params ) = @_;
-                return $self->request( 'GET', sprintf( '%ss.json', $key ), $params );
+                return $self->request( 'GET', sprintf( '%ss.json', $key ), $params, $targ_rep );
             }
         );
 
         $meta->add_method(
             "update_$key" => sub {
                 my ( $self, $id, $params ) = @_;
-                return $self->request( 'PUT', sprintf( '%ss/%d.json', $key, $id ), { "targ_rep_$key" => $params } );
+                return $self->request( 'PUT', sprintf( '%ss/%d.json', $key, $id ), { "targ_rep_$key" => $params }, $targ_rep );
             }
         );
 
         $meta->add_method(
             "create_$key" => sub {
                 my ( $self, $params ) = @_;
-                return $self->request( 'POST', sprintf( '%ss.json', $key ), { "targ_rep_$key" => $params } );
+                return $self->request( 'POST', sprintf( '%ss.json', $key ), { "targ_rep_$key" => $params }, $targ_rep );
             }
         );
 
         $meta->add_method(
             "delete_$key" => sub {
                 my ( $self, $id ) = @_;
-                return $self->request( 'DELETE', sprintf( '%ss/%d.json', "targ_rep_$key", $id ) );
+                return $self->request( 'DELETE', sprintf( '%ss/%d.json', "targ_rep_$key", $id ), undef, $targ_rep );
             }
         );
     }
 
     $meta->make_immutable;
+}
+
+sub find_mi_attempt {
+    my ( $self, $params ) = @_;
+    my $targ_rep = 0;
+
+    return $self->request( 'GET', sprintf( '%ss.json', 'mi_attempt' ), $params, $targ_rep );
 }
 
 1;
