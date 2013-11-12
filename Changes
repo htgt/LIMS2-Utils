@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.024     2013-11-12 09:50:38 Europe/London
+
+    Update Tarmits client to add a find_mi_attempt method
+
 0.023     2013-11-05 07:35:08 Europe/London
 
     Pre-build mech and pass to LIMS2::Test subroutines to get correct user connection.
