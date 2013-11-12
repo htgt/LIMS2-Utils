@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.023     2013-11-05 07:35:08 Europe/London
+
+    Pre-build mech and pass to LIMS2::Test subroutines to get correct user connection.
+
 0.022     2013-11-04 08:15:55 Europe/London
 
     Added utility modules dealing with test fixture data creation.
