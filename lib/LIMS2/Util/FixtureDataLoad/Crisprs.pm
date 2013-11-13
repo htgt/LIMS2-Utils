@@ -131,7 +131,7 @@ sub _create_crispr {
     $self->log->debug( 'Copy crispr off target summary data' );
     for my $ots ( $crispr->off_target_summaries->all ) {
         my $datum = $self->get_dbix_row_data( $ots );
-        $self->dest_model->schema->resultset('CrisprOffTargetSummaries')->create( $datum  );
+        $self->dest_model->schema->resultset('CrisprOffTargetSummary')->create( $datum  );
     }
 
     $self->log->debug( 'Copy crispr loci data' );
