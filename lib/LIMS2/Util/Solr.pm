@@ -1,7 +1,7 @@
 package LIMS2::Util::Solr;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::Solr::VERSION = '0.025';
+    $LIMS2::Util::Solr::VERSION = '0.026';
 }
 ## use critic
 

@@ -1,18 +1,19 @@
 package LIMS2::Util::FarmJobRunner;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::FarmJobRunner::VERSION = '0.025';
+    $LIMS2::Util::FarmJobRunner::VERSION = '0.026';
 }
 ## use critic
 
 
-use strict;
 use warnings FATAL => 'all';
 
 use Moose;
 use Moose::Util::TypeConstraints;
 use MooseX::Types::Path::Class::MoreCoercions qw( File );
 use MooseX::Params::Validate;
+
+with 'MooseX::Log::Log4perl';
 
 use Try::Tiny;
 use Path::Class;
@@ -32,18 +33,25 @@ has default_memory => (
     default => 2000,
 );
 
-#this is the file that sets the appropriate environment for running farm jobs.
+has default_processors => (
+    is      => 'rw',
+    isa     => 'Num',
+    default => 1,
+);
+
+#source this file to setup env variables to run in farm
+# TODO work out the parameter to pass to this file here
 has bsub_wrapper => (
-    is => 'rw',
-    isa => File,
-    coerce => 1,
-    default => sub{ file( 'run_in_perlbrew' ) } #this is in LIMS2-Webapp/scripts
+    is      => 'rw',
+    isa     => File,
+    coerce  => 1,
+    default => sub{ file( '/nfs/team87/farm3_lims2_vms/conf/run_in_farm3' ) },
 );
 
 #to make testing easier
 has dry_run => (
-    is => 'rw',
-    isa => 'Bool',
+    is      => 'rw',
+    isa     => 'Bool',
     default => 0
 );
 
@@ -64,12 +72,13 @@ sub submit_pspec {
         #the rest are optional
         queue           => { isa => 'Str', optional => 1, default => $self->default_queue },
         memory_required => { isa => 'Int', optional => 1, default => $self->default_memory },
-        err_file        => { isa => File, optional => 1, coerce => 1 },
+        processors      => { isa => 'Int', optional => 1, default => $self->default_processors },
+        err_file        => { isa => File,  optional => 1, coerce => 1 },
         dependencies    => { isa => 'ArrayRefOfInts', optional => 1, coerce => 1 },
     );
 }
 
-#set all common options for bsub and run the user specified command. 
+#set all common options for bsub and run the user specified command.
 sub submit {
     my ( $self ) = shift;
 
@@ -79,8 +88,12 @@ sub submit {
         'bsub',
         '-q', $args{ queue },
         '-o', $args{ out_file },
-        '-M', $args{ memory_required } * 1000, #farm -M is weird and not in MB or GB
-        '-R', '"select[mem>' . $args{ memory_required } . '] rusage[mem=' . $args{ memory_required } . ']"',
+        '-M', $args{ memory_required },
+        '-n', $args{ processors },
+        '-R',
+              '"select[mem>' . $args{memory_required}
+            . '] rusage[mem=' . $args{memory_required}
+            . '] span[hosts=1]"',
         '-G', 'team87-grp',
     );
 
@@ -102,10 +115,11 @@ sub submit {
 
     my @cmd = $self->_wrap_bsub( @bsub ); #this is the end command that will be run
 
-    return @cmd if $self->dry_run;
+    return \@cmd if $self->dry_run;
 
     my $output = $self->_run_cmd( @cmd );
     my ( $job_id ) = $output =~ /Job <(\d+)>/;
+    ### $job_id
 
     return $job_id;
 }
@@ -116,13 +130,28 @@ sub _wrap_bsub {
     my ( $self, @bsub ) = @_;
 
     #which returns undef if it cant find the file
-    which( $self->bsub_wrapper )
-        or confess "Couldn't locate " . $self->bsub_wrapper;
+    #which( $self->bsub_wrapper )
+        #or confess "Couldn't locate " . $self->bsub_wrapper;
 
-    return (
-        $self->bsub_wrapper,
-        join " ", @bsub,
-    );
+    #TODO move this logic sp12 Thu 19 Dec 2013 09:23:07 GMT
+    my $lims2_env
+        = $ENV{LIMS2_DB} eq 'LIMS2_LIVE'    ? 'live'
+        : $ENV{LIMS2_DB} eq 'LIMS2_STAGING' ? 'staging'
+        : $ENV{LIMS2_REST_CLIENT_CONFIG}    ? $ENV{LIMS2_REST_CLIENT_CONFIG}
+        :                                     undef;
+    confess "Must be in live or staging environment, if in devel must have LIMS2_REST_CLIENT_CONFIG set"
+        unless $lims2_env;
+
+    my $cmd
+        = 'source /etc/profile;'
+        . 'source ' . $self->bsub_wrapper->stringify . " $lims2_env;"
+        . join( " ", @bsub );
+
+    # temp wrap in ssh to farm3-login, until vms can submit to farm3 directly
+    my @wrapped_cmd = ( 'ssh', '-o CheckHostIP=no', '-o BatchMode=yes', 'farm3-login');
+    push @wrapped_cmd, $cmd;
+
+    return @wrapped_cmd;
 }
 
 sub _build_job_dependency {
@@ -144,6 +173,7 @@ sub _run_cmd {
 
     my $output;
 
+    $self->log->debug( "CMD: " . join(' ', @cmd) );
     try {
         IPC::Run::run( \@cmd, '<', \undef, '>&', \$output )
                 or die "$output";
@@ -175,35 +205,38 @@ LIMS2::Util::FarmJobRunner
   $runner = LIMS2::Util::FarmJobRunner->new( {
     default_queue  => "basement",
     default_memory => "3000",
+    default_processors => 2,
     bsub_wrapper   => "custom_environment_setter.pl"
   } );
 
   #required parameters
-  my $job_id = $runner->submit( 
-    out_file => "/nfs/users/nfs_a/ah19/bsub_output.out", 
-    cmd      => [ "echo", "test" ] 
+  my $job_id = $runner->submit(
+    out_file => "/nfs/users/nfs_a/ah19/bsub_output.out",
+    cmd      => [ "echo", "test" ]
   );
 
   #all optional parameters set
-  my $next_job_id = $runner->submit( 
+  my $next_job_id = $runner->submit(
     out_file        => "/nfs/users/nfs_a/ah19/bsub_output2.out",
     err_file        => "/nfs/users/nfs_a/ah19/bsub_output2.err",
     queue           => "short",
     memory_required => 4000,
     dependencies    => $job_id,
-    cmd             => [ "echo", "test" ] 
+    cmd             => [ "echo", "test" ]
   );
 
-  #multiple dependencies 
-  $runner->submit( 
+  #multiple dependencies
+  $runner->submit(
     out_file     => "/nfs/users/nfs_a/ah19/bsub_output3.out",
     dependencies => [ $job_id, $next_job_id ],
-    cmd          => [ "echo", "test" ] 
+    cmd          => [ "echo", "test" ]
   );
 
 =head1 DESCRIPTION
 
-Helper module for running bsub jobs from LIMS2/The VMs. 
+NOTE: Temporary hack to get it working in farm3 ( by sshing command to farm3-login )
+
+Helper module for running bsub jobs from LIMS2/The VMs.
 Sets the appropriate environment for using our perlbrew install in /software.
 
 The default queue is normal, and the default memory required is 2000 MB.
