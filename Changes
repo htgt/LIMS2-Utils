@@ -1,3 +1,6 @@
+0.027     2014-01-14 14:57:01 Europe/London
+	Modified transcript id and exception handling in TarmitsFeed. 
+
 0.026     2013-12-19 09:46:54 Europe/London
 
     Hack FarmJobRunner to work with farm3

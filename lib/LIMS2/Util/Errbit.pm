@@ -1,7 +1,7 @@
 package LIMS2::Util::Errbit;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::Errbit::VERSION = '0.026';
+    $LIMS2::Util::Errbit::VERSION = '0.027';
 }
 ## use critic
 

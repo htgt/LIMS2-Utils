@@ -1,7 +1,7 @@
 package LIMS2::Util::FixtureDataLoad::Crisprs;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::FixtureDataLoad::Crisprs::VERSION = '0.026';
+    $LIMS2::Util::FixtureDataLoad::Crisprs::VERSION = '0.027';
 }
 ## use critic
 
