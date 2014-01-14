@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.026     2013-12-19 09:46:54 Europe/London
+
+    Hack FarmJobRunner to work with farm3
+
 0.025     2013-12-03 11:11:37 Europe/London
 
     Switch to ensembldb.internal.sanger.ac.uk 
