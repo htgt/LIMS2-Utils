@@ -329,7 +329,7 @@ sub get_single_exon_data {
 sub get_single_design_data {
     my ( $self, $design_id ) = @_;
 
-    my $design = $self->model->retrieve_design( { id => $design_id } );
+    my $design = $self->model->c_retrieve_design( { id => $design_id } );
     my $design_info = LIMS2::Model::Util::DesignInfo->new( design => $design );
 
     my ( $exons, $total_sites ) = ( 0, 0 ); #we'll keep a running total

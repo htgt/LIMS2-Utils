@@ -1744,7 +1744,7 @@ sub _refactor_selected_clones {
             try {
 
                 # fetch design object
-                my $design = $self->model->retrieve_design( { 'id' => $result->{ 'design_id' }, 'species' => $self->species } );
+                my $design = $self->model->c_retrieve_design( { 'id' => $result->{ 'design_id' }, 'species' => $self->species } );
                 my $design_info = $design->info;
 
                 # fetch hashref of oligos from design info
