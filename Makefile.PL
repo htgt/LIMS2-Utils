@@ -22,12 +22,12 @@ my %WriteMakefileArgs = (
   },
   "DISTNAME" => "LIMS2-Util",
   "EXE_FILES" => [
-    "bin/tarmits_feed_wrapper.pl",
     "bin/fixture_data_bacs.pl",
     "bin/fixture_data_crisprs.pl",
     "bin/fixture_data_designs.pl",
     "bin/fixture_data_helper.pl",
-    "bin/fixture_data_plate_wells.pl"
+    "bin/fixture_data_plate_wells.pl",
+    "bin/tarmits_feed_wrapper.pl"
   ],
   "LICENSE" => "perl",
   "NAME" => "LIMS2::Util",
@@ -82,7 +82,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.027",
+  "VERSION" => "0.028",
   "test" => {
     "TESTS" => "t/*.t"
   }
