@@ -41,7 +41,8 @@ ok -e $c->get_filename( 'sites' ), 'initial output exists';
 ok -e $c->get_filename( 'fasta' ), 'fasta reads exist';
 
 #could do with testing with a design as well...
-
+# This module is not used at the moment - commenting out tests
+=head
 ok $c->run_exonerate, 'exonerate can run';
 ok -e $c->get_filename( 'exonerate' );
 
@@ -299,5 +300,5 @@ my @db_data = (
 );
 
 is_deeply \@db_data, [ YAML::Any::LoadFile( $c->get_filename( 'db' )->stringify ) ], 'db output data matches';
-
+=cut
 done_testing;
