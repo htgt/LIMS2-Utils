@@ -1,7 +1,7 @@
 package LIMS2::Util::FixtureDataLoad::Designs;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::FixtureDataLoad::Designs::VERSION = '0.028';
+    $LIMS2::Util::FixtureDataLoad::Designs::VERSION = '0.029';
 }
 ## use critic
 
@@ -69,7 +69,7 @@ sub create_destination_design {
     my $unknown_user = $self->source_model->schema->resultset( 'User' )->find( { name => 'unknown' } );
     $self->find_or_create_user( $unknown_user  );
 
-    $self->dest_model->create_design( $design_data );
+    $self->dest_model->c_create_design( $design_data );
     $self->log->info( "Design created" );
 
     return;

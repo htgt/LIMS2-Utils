@@ -1,7 +1,7 @@
 package LIMS2::Util::FarmJobRunner;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::FarmJobRunner::VERSION = '0.028';
+    $LIMS2::Util::FarmJobRunner::VERSION = '0.029';
 }
 ## use critic
 
