@@ -1,5 +1,8 @@
 {{$NEXT}}
 
+0.028     2014-02-18 10:38:29 Europe/London
+	Corrected design plugin method names to use those in WebApp-Common
+
 0.027     2014-01-14 14:57:01 Europe/London
 	Modified transcript id and exception handling in TarmitsFeed. 
 
