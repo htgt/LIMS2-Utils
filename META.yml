@@ -26,7 +26,6 @@ requires:
   Data::Dumper: 0
   EngSeqBuilder: 0
   File::Temp: 0
-  File::Which: 0
   Getopt::Long: 0
   HTTP::Request: 0
   Hash::MoreUtils: 0
@@ -48,9 +47,7 @@ requires:
   Moose::Util::TypeConstraints: 0
   MooseX::ClassAttribute: 0
   MooseX::Log::Log4perl: 0
-  MooseX::Params::Validate: 0
   MooseX::SimpleConfig: 0
-  MooseX::Types::Path::Class::MoreCoercions: 0
   MooseX::Types::URI: 0
   Path::Class: 0
   Pod::Usage: 0
@@ -66,4 +63,4 @@ requires:
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.029
+version: 0.030

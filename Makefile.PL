@@ -22,12 +22,12 @@ my %WriteMakefileArgs = (
   },
   "DISTNAME" => "LIMS2-Util",
   "EXE_FILES" => [
+    "bin/tarmits_feed_wrapper.pl",
     "bin/fixture_data_bacs.pl",
     "bin/fixture_data_crisprs.pl",
     "bin/fixture_data_designs.pl",
     "bin/fixture_data_helper.pl",
-    "bin/fixture_data_plate_wells.pl",
-    "bin/tarmits_feed_wrapper.pl"
+    "bin/fixture_data_plate_wells.pl"
   ],
   "LICENSE" => "perl",
   "NAME" => "LIMS2::Util",
@@ -41,7 +41,6 @@ my %WriteMakefileArgs = (
     "Data::Dumper" => 0,
     "EngSeqBuilder" => 0,
     "File::Temp" => 0,
-    "File::Which" => 0,
     "Getopt::Long" => 0,
     "HTTP::Request" => 0,
     "Hash::MoreUtils" => 0,
@@ -63,9 +62,7 @@ my %WriteMakefileArgs = (
     "Moose::Util::TypeConstraints" => 0,
     "MooseX::ClassAttribute" => 0,
     "MooseX::Log::Log4perl" => 0,
-    "MooseX::Params::Validate" => 0,
     "MooseX::SimpleConfig" => 0,
-    "MooseX::Types::Path::Class::MoreCoercions" => 0,
     "MooseX::Types::URI" => 0,
     "Path::Class" => 0,
     "Pod::Usage" => 0,
@@ -82,7 +79,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.029",
+  "VERSION" => "0.030",
   "test" => {
     "TESTS" => "t/*.t"
   }

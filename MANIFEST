@@ -15,7 +15,6 @@ lib/LIMS2/Util.pm
 lib/LIMS2/Util/Crisprs.pm
 lib/LIMS2/Util/EnsEMBL.pm
 lib/LIMS2/Util/Errbit.pm
-lib/LIMS2/Util/FarmJobRunner.pm
 lib/LIMS2/Util/FixtureDataLoad.pm
 lib/LIMS2/Util/FixtureDataLoad/Bacs.pm
 lib/LIMS2/Util/FixtureDataLoad/Crisprs.pm
@@ -34,7 +33,6 @@ t/20-lims2-util-yaml_iterator.t
 t/20-retry.t
 t/30-lims2-util-solr.t
 t/40-lims2-util-errbit.t
-t/40-lims2-util-farmjobrunner.t
 t/40-lims2-util-tarmits.t
 t/author-critic.t
 t/release-no-smart-comments.t
