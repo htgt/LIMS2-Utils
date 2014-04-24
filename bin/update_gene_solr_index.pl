@@ -21,27 +21,13 @@ my $update_file = '/var/tmp/gene_list.xml';
 my $human_file = '/var/tmp/hgnc_list.txt';
 
 
-# get list of HGNC approved symbols
+# get list of HGNC approved symbols and save it on the new file
 INFO "Getting list of HGNC genes...\n";
-open (HGNC, ">$human_file");
-my $url = 'http://www.genenames.org/cgi-bin/download?'.
-          'col=gd_hgnc_id&'.
-          'col=gd_app_sym&'.
-          'col=gd_app_name&'.
-          'col=md_ensembl_id&'.
-          'status=Approved&'.
-          'status_opt=2&'.
-          'where=%28%28gd_pub_chrom_map%20not%20like%20%27%25patch%25%27%20and%20gd_pub_chrom_map%20not%20like%20%27%25alternate%20reference%20locus%25%27%29%20or%20gd_pub_chrom_map%20IS%20NULL%29&'.
-          'order_by=gd_hgnc_id&'.
-          'format=text&'.
-          'limit=&'.
-          'hgnc_dbtag=on&'.
-          'submit=submit';
-# save it on the new file
-my $page = get($url)
+open my $HGNC, '>', "$human_file" or die $!;
+my $page = get('http://www.genenames.org/cgi-bin/download?col=gd_hgnc_id&col=gd_app_sym&col=gd_app_name&col=md_ensembl_id&status=Approved&status_opt=2&where=%28%28gd_pub_chrom_map%20not%20like%20%27%25patch%25%27%20and%20gd_pub_chrom_map%20not%20like%20%27%25alternate%20reference%20locus%25%27%29%20or%20gd_pub_chrom_map%20IS%20NULL%29&order_by=gd_hgnc_id&format=text&limit=&hgnc_dbtag=on&submit=submit')
 or die ERROR "Could not get list of HGNC genes.\n";
-print HGNC $page;
-close (HGNC);
+print $HGNC $page;
+close $HGNC;
 
 
 # Mouse data
@@ -61,7 +47,17 @@ if ( $status != 200) {
 
 # create the xml file to update the index
 INFO "Building gene_list.xml...";
+
+
+open my $GENE_LIST, '>' , $update_file or die $!;
+open my $HUMAN_FILE, '<', $human_file or die $!;
+open my $MOUSE_FILE, '<', $mouse_file or die $!;
 build_list();
+close $GENE_LIST;
+close $HUMAN_FILE;
+close $MOUSE_FILE;
+
+
 system("rm $human_file");
 system("rm $mouse_file");
 
@@ -93,24 +89,26 @@ sub build_list {
     });
 
 
-    open (GENE_LIST, ">$update_file");
-    print GENE_LIST "<add>\n";
+    # open my $GENE_LIST, '>' ,"$update_file" or die $!;
+    print $GENE_LIST "<add>\n";
 
     my @gene_list = map {$_->gene_id} @rows;
 
 
-    open (HUMAN_FILE, $human_file);
-    while (<HUMAN_FILE>) {
+    # open my $HUMAN_FILE, '<', $human_file or die $!;
+    while (<$HUMAN_FILE>) {
         chomp;
         my $species = 'Human';
         if (/(HGNC:\d*)\t([^\t]*)\t([^\t]*)\t([^\t]*)/) {
             my ($id, $symbol, $ensembl, $name) = ($1, $2, $4, encode_entities($3) );
 
-            print GENE_LIST "  <doc>
+            print $GENE_LIST <<"END";
+  <doc>
     <field name=\"id\">$id</field>
     <field name=\"symbol\">$symbol</field>
     <field name=\"ensembl_id\">$ensembl</field>
-    <field name=\"species\">$species</field>";
+    <field name=\"species\">$species</field>
+END
 
             if ( first { $_ eq $id } @gene_list ) {
 
@@ -130,31 +128,35 @@ sub build_list {
                 my $crispr_pairs_count = sum map { $_->{ 'crispr_pairs' } } @{$designs};
                 if (!defined $crispr_pairs_count) {$crispr_pairs_count = 0};
 
-                print GENE_LIST "
+                print $GENE_LIST <<"END";
     <field name=\"design_count\">$design_count</field>
-    <field name=\"crispr_pairs_count\">$crispr_pairs_count</field>";
+    <field name=\"crispr_pairs_count\">$crispr_pairs_count</field>
+END
             }
 
-            print GENE_LIST "
-  </doc>\n";
+            print $GENE_LIST <<"END";
+  </doc>
+END
 
         }
     }
-    close (HUMAN_FILE);
+    # close $HUMAN_FILE;
 
 
-    open (MOUSE_FILE, $mouse_file);
-    while (<MOUSE_FILE>) {
+    # open my $MOUSE_FILE, '<', $mouse_file or die $!;
+    while (<$MOUSE_FILE>) {
         chomp;
         my $species = 'Mouse';
         if (/(MGI:\d*)\t([^\t]*)\t([^\t]*)\t[^\t]*\t[^\t]*\t([^\t]*)/) {
             my ($id, $symbol, $ensembl, $name) = ($1, $2, $4, encode_entities($3) );
 
-            print GENE_LIST "  <doc>
+            print $GENE_LIST <<"END";
+  <doc>
     <field name=\"id\">$id</field>
     <field name=\"symbol\">$symbol</field>
     <field name=\"ensembl_id\">$ensembl</field>
-    <field name=\"species\">$species</field>";
+    <field name=\"species\">$species</field>
+END
 
             if ( first { $_ eq $id } @gene_list ) {
 
@@ -174,21 +176,23 @@ sub build_list {
                 my $crispr_pairs_count = sum map { $_->{ 'crispr_pairs' } } @{$designs};
                 if (!defined $crispr_pairs_count) {$crispr_pairs_count = 0};
 
-                print GENE_LIST "
+                print $GENE_LIST <<"END";
     <field name=\"design_count\">$design_count</field>
-    <field name=\"crispr_pairs_count\">$crispr_pairs_count</field>";
+    <field name=\"crispr_pairs_count\">$crispr_pairs_count</field>
+END
             }
 
-            print GENE_LIST "
-  </doc>\n";
+            print $GENE_LIST <<"END";
+  </doc>
+END
 
         }
     }
-    close (MOUSE_FILE);
+    # close $MOUSE_FILE;
 
 
-    print GENE_LIST "</add>\n";
-    close (GENE_LIST);
+    print $GENE_LIST "</add>\n";
+    # close $GENE_LIST;
 
     return;
 }

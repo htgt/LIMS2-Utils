@@ -1,5 +1,7 @@
 {{$NEXT}}
 
+    Added script to update the gene solr index
+
 0.030     2014-02-24 14:44:13 Europe/London
 
     Switch to ensembldb.ensembl.org 
