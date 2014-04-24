@@ -9,13 +9,20 @@ use LIMS2::Model;
 use LIMS2::Model::Util::DesignTargets qw( design_target_report_for_genes );
 use LIMS2::Model::Constants qw( %DEFAULT_SPECIES_BUILD );
 use List::Util qw(sum first);
+use Log::Log4perl ':easy';
+
+
+
+my $start_time=localtime;
+
+my $update_file = '/var/tmp/gene_list.xml';
 
 # Human data
-my $human_file = 'hgnc_list.txt';
+my $human_file = '/var/tmp/hgnc_list.txt';
 
 
 # get list of HGNC approved symbols
-print "Getting list of HGNC genes...\n";
+INFO "Getting list of HGNC genes...\n";
 open (HGNC, ">$human_file");
 my $url = 'http://www.genenames.org/cgi-bin/download?'.
           'col=gd_hgnc_id&'.
@@ -32,37 +39,43 @@ my $url = 'http://www.genenames.org/cgi-bin/download?'.
           'submit=submit';
 # save it on the new file
 my $page = get($url)
-or die "ERROR: Could not get list of HGNC genes.\n";
+or die ERROR "Could not get list of HGNC genes.\n";
 print HGNC $page;
 close (HGNC);
 
 
 # Mouse data
-my $mouse_file = 'mgi_list.txt';
+my $mouse_file = '/var/tmp/mgi_list.txt';
 my $mouse_location = 'ftp://ftp.informatics.jax.org/pub/reports/MRK_ENSEMBL.rpt';
 
 
 
 
 # get list of MGI approved symbols
-print "Getting list of MGI genes...\n";
+INFO "Getting list of MGI genes...\n";
 my $status = getstore($mouse_location, $mouse_file);
 if ( $status != 200) {
-    die "ERROR: Could not get list of MGI genes.\n";
+    die ERROR "Could not get list of MGI genes.\n";
 }
 
 
 # create the xml file to update the index
-print "Building gene_list.xml...";
+INFO "Building gene_list.xml...";
 build_list();
 system("rm $human_file");
 system("rm $mouse_file");
 
 
-print "Updating index...\n";
-system("sh post.sh gene_list.xml");
-print "Done.\n";
+INFO "Updating solr index...\n";
+system("sh post.sh $update_file");
+system("rm $update_file");
+INFO "Done.\n";
 
+
+#  End and print out totals
+my $end_time=localtime;
+INFO "LIMS2 gene solr index update: Start time was       : $start_time";
+INFO "LIMS2 gene solr index update: Process completed at : $end_time";
 
 
 
@@ -80,7 +93,7 @@ sub build_list {
     });
 
 
-    open (GENE_LIST, '>gene_list.xml');
+    open (GENE_LIST, ">$update_file");
     print GENE_LIST "<add>\n";
 
     my @gene_list = map {$_->gene_id} @rows;
@@ -179,5 +192,8 @@ sub build_list {
 
     return;
 }
+
+
+
 
 
