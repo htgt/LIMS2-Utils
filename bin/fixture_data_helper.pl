@@ -67,11 +67,11 @@ fixture_data_helper.pl - setup of test database and dumping of test data
       --class           Specify class fixture data you want to load into database
       --dump            Name of directory test data will be dumped to
 
-IMPORTANT:
-* The LIMS2_DBCONNECT_CONFIG env variable must be pointing to a config file with the details
+The LIMS2_DBCONNECT_CONFIG env variable must be pointing to a config file with the details
 of the test database you are using.
-* To load the test data files from your working LIMS2::WebApp directory make sure it is in the
-PERL5LIB env variable. e.g. export PERL5LIB=~/workspace/LIMS2-WebApp/lib:$PERL5LIB
+
+To load the test data files from your working LIMS2::WebApp directory make sure it is in the
+PERL5LIB env variable. e.g. export PERL5LIB=~/workspace/LIMS2-Webapp/lib:$PERL5LIB
 
 =head1 DESCRIPTION
 
