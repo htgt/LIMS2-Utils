@@ -10,10 +10,6 @@ use EngSeqBuilder;
 use JSON;
 use LIMS2::Model::Util::EngSeqParams qw ( generate_well_eng_seq_params );
 
-use Data::Dumper;
-
-# use Smart::Comments;
-
 has model => (
     is         => 'ro',
     isa        => 'LIMS2::Model',
@@ -273,10 +269,6 @@ sub _build_es_clones {
     # refactor the data from flattened structure into nested hash
     my $es_clones       = $self->_refactor_selected_clones( $es_clones_array );
 
-    print "------------- refactored hash------------\n";
-    print ( Dumper ( $es_clones ) );
-    print "-----------end refactored hash ------------\n";
-
     if ( $self->force_updates ) {
         INFO "Flag for FORCE UPDATES is set to true";
     }
@@ -441,16 +433,16 @@ sub _check_design_against_tarmits {
         # NON-dre allele should always be checked/created as the targeting vector connects to that allele
         $self->_check_for_existing_no_dre_allele( $curr_vector_hash );
         unless ( defined $self->curr_allele_no_dre_id ) {
-            ERROR "Failed to determine id for no dre allele, cannot continue down to targeting vectors for gene ID: ".$self->curr_gene_mgi_id;
+            ERROR "Failed to determine id for no dre allele, for gene ID: ".$self->curr_gene_mgi_id;
             return;
         }
         INFO $self->curr_gene_mgi_id.": No Dre Allele ID: ".$self->curr_allele_no_dre_id;
-        
-        # dre allele optional and only created if we have accepted dre clones
-        if ( $curr_vector_hash->{ 'count_accepted_clones_dre' } > 0 ) {
+
+        # dre allele optional and only created if we have dre clones
+        if ( $curr_vector_hash->{ 'count_clones_dre' } > 0 ) {
             $self->_check_for_existing_dre_allele( $curr_vector_hash );
             unless ( defined $self->curr_allele_dre_id ) {
-                ERROR "Failed to determine id for no dre allele, cannot continue down to targeting vectors for gene ID: ".$self->curr_gene_mgi_id;
+                ERROR "Failed to determine id for no dre allele, for gene ID: ".$self->curr_gene_mgi_id;
                 return;
             }
             INFO $self->curr_gene_mgi_id.": Dre Allele ID: ".$self->curr_allele_dre_id;
@@ -726,6 +718,7 @@ sub _check_targeting_vector_against_tarmits {
 
             # check whether the targeting vector is connected to the correct allele; if not update it
             my $current_tv_allele_id = $tv_find_results->[0]->{ 'allele_id' };
+
             if( $current_tv_allele_id != $self->curr_allele_no_dre_id ) {
                 DEBUG "Targeting vectors current allele ID <" . $current_tv_allele_id . "> does not match expected ID <" . $self->curr_allele_no_dre_id . ">, update it";
                 unless ( $self->_update_targ_vect_allele_id() ) {
@@ -990,8 +983,29 @@ sub _check_es_cell_against_tarmits {
             DEBUG "Found ES cell clone match, ID: ".$self->curr_es_cell_clone_id;
         }
 
-        # if force updates is on
+        # optional forced updates
         if ( $self->force_updates ) {
+            DEBUG "Force updates: checking whether need to update allele ID";
+            DEBUG "Force updates: clone has current database allele id : " . $clone_curr_db_allele_id;
+            if( $self->curr_allele_dre_id ) { DEBUG "Force updates: calculated dre allele id : " . $self->curr_allele_dre_id; }
+            if( $self->curr_allele_no_dre_id ) { DEBUG "Force updates: calculated NON dre allele id : " . $self->curr_allele_no_dre_id; }
+
+            if ( $self->curr_clone_has_dre && ( $clone_curr_db_allele_id != $self->curr_allele_dre_id ) ) {
+                DEBUG "Identified need to update allele ID from " . $clone_curr_db_allele_id . " to dre allele id " . $self->curr_allele_dre_id;
+                # need to update clone allele ID as pointing at the wrong allele
+                unless ( $self->_update_clone_allele_id( $self->curr_allele_dre_id ) ) {
+                    ERROR "Failed to update es cell clone allele id for clone name: " . $self->curr_clone_name;
+                }
+            }
+
+            if ( !$self->curr_clone_has_dre && ( $clone_curr_db_allele_id != $self->curr_allele_no_dre_id ) ) {
+                DEBUG "Identified need to update allele ID from " . $clone_curr_db_allele_id . " to NON dre allele id " . $self->curr_allele_no_dre_id;
+                # need to update clone allele ID as pointing at the wrong allele
+                unless ( $self->_update_clone_allele_id( $self->curr_allele_no_dre_id ) ) {
+                    ERROR "Failed to update es cell clone allele id for clone name: " . $self->curr_clone_name;
+                }
+            }
+
             DEBUG "Force updates: updating ikmc project ID";
 
             # update the ikmc project ID for this es cell clone
@@ -1004,25 +1018,6 @@ sub _check_es_cell_against_tarmits {
             #   update the allele symbol superscript
             if (!$self->_update_clone_allele_symbol_superscript() ) {
                 ERROR "Failed to update es cell clone allele symbol superscript for clone name: ".$self->curr_clone_name;
-            }
-
-            DEBUG "Force updates: checking whether need to update allele ID";
-            DEBUG "Force updates: clone has current database allele id : " . $clone_curr_db_allele_id;
-
-            if ( $self->curr_clone_has_dre && ( $clone_curr_db_allele_id ne $self->curr_allele_dre_id ) ) {
-                DEBUG "Identified need to update allele ID from " . $clone_curr_db_allele_id . " to dre allele id " . $self->curr_allele_dre_id;
-                # need to update clone allele ID as pointing at the wrong allele
-                unless ( $self->_update_clone_allele_id( $self->curr_allele_dre_id ) ) {
-                    ERROR "Failed to update es cell clone allele id for clone name: " . $self->curr_clone_name;
-                }
-            }
-
-            unless ( $self->curr_clone_has_dre && ( $clone_curr_db_allele_id ne $self->curr_allele_no_dre_id ) ) {
-                DEBUG "Identified need to update allele ID from " . $clone_curr_db_allele_id . " to NON dre allele id " . $self->curr_allele_no_dre_id;
-                # need to update clone allele ID as pointing at the wrong allele
-                unless ( $self->_update_clone_allele_id( $self->curr_allele_no_dre_id ) ) {
-                    ERROR "Failed to update es cell clone allele id for clone name: " . $self->curr_clone_name;
-                }
             }
         }
 
@@ -1889,19 +1884,11 @@ sub _refactor_selected_clones {
 sub _increment_vector_counters {
     my ( $self, $ep_recombinase, $es_clone_id, $curr_targ_vector_hash ) = @_;
 
-    unless ( exists $curr_targ_vector_hash->{ 'clones' }->{ $es_clone_id }->{ 'info' }->{ 'clone_accepted' } ) {
-        return;
+    if ( $ep_recombinase eq 'Dre' ) {
+        $curr_targ_vector_hash->{ 'count_clones_dre' } += 1;
     }
-    
-    if ( $curr_targ_vector_hash->{ 'clones' }->{ $es_clone_id }->{ 'info' }->{ 'clone_accepted' } == 1 ) {
-        if ( $ep_recombinase eq 'Dre' ) {
-            DEBUG "IN _increment_vector_counters : incrementing dre counter";
-            $curr_targ_vector_hash->{ 'count_accepted_clones_dre' } += 1;
-        }
-        else {
-            DEBUG "IN _increment_vector_counters : incrementing dre counter";
-            $curr_targ_vector_hash->{ 'count_accepted_clones_no_dre' } += 1;
-        }                
+    else {
+        $curr_targ_vector_hash->{ 'count_clones_no_dre' } += 1;
     }
 
     return;
@@ -2042,8 +2029,8 @@ sub _select_lims2_targeting_vector_details {
 
     my %targ_vector_details;
 
-    $targ_vector_details{ 'count_accepted_clones_no_dre'}             = 0;
-    $targ_vector_details{ 'count_accepted_clones_dre'}                = 0;
+    $targ_vector_details{ 'count_clones_no_dre'}             = 0;
+    $targ_vector_details{ 'count_clones_dre'}                = 0;
 
     $targ_vector_details{ 'info' }->{ 'targeting_vector_plate_id' }   = $result->{ 'targeting_vector_plate_id' };
     $targ_vector_details{ 'info' }->{ 'targeting_vector_plate_name' } = $result->{ 'targeting_vector_plate_name' };
@@ -2365,12 +2352,6 @@ AND (
     )
 )
 AND s.ep_pick_well_id > 0
-
---AND  s.final_pick_cassette_name IN (
---    'pL1L2GT0_LF2A_nEGFPOT2A_CreERT2_pAbActNeopA',
---    'pL1L2GT1_LF2A_nEGFPOT2A_CreERT2_pAbActNeopA',
---    'pL1L2GT2_LF2A_nEGFPOT2A_CreERT2_pAbActNeopA',
---    'pL1L2GTK_LF2A_nEGFPOT2A_CreERT2_pAbActNeopA' )
 
 GROUP by pr.project_id
 , pr.htgt_project_id
