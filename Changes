@@ -1,5 +1,8 @@
 {{$NEXT}}
 
+0.032     2014-05-28 09:59:20 Europe/London
+	Modfied the Tarmits feed to allow for multiple targeting vectors per design
+
 0.031     2014-04-24 14:17:16 Europe/London
 
     Added script to update the gene solr index
