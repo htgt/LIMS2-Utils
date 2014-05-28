@@ -27,7 +27,9 @@ my %WriteMakefileArgs = (
     "bin/fixture_data_crisprs.pl",
     "bin/fixture_data_designs.pl",
     "bin/fixture_data_helper.pl",
-    "bin/fixture_data_plate_wells.pl"
+    "bin/fixture_data_plate_wells.pl",
+    "bin/post.sh",
+    "bin/update_gene_solr_index.pl"
   ],
   "LICENSE" => "perl",
   "NAME" => "LIMS2::Util",
@@ -42,6 +44,7 @@ my %WriteMakefileArgs = (
     "EngSeqBuilder" => 0,
     "File::Temp" => 0,
     "Getopt::Long" => 0,
+    "HTML::Entities" => 0,
     "HTTP::Request" => 0,
     "Hash::MoreUtils" => 0,
     "IO::File" => 0,
@@ -51,12 +54,16 @@ my %WriteMakefileArgs = (
     "JSON" => 0,
     "LIMS2::Exception" => 0,
     "LIMS2::Model" => 0,
+    "LIMS2::Model::Constants" => 0,
     "LIMS2::Model::DBConnect" => 0,
     "LIMS2::Model::Util::DesignInfo" => 0,
+    "LIMS2::Model::Util::DesignTargets" => 0,
     "LIMS2::Model::Util::EngSeqParams" => 0,
     "LIMS2::Test" => 0,
+    "LWP::Simple" => 0,
     "LWP::UserAgent" => 0,
     "List::MoreUtils" => 0,
+    "List::Util" => 0,
     "Log::Log4perl" => 0,
     "Moose" => 0,
     "Moose::Util::TypeConstraints" => 0,
@@ -79,7 +86,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.030",
+  "VERSION" => "0.032",
   "test" => {
     "TESTS" => "t/*.t"
   }

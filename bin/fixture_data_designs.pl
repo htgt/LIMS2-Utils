@@ -59,6 +59,10 @@ fixture_data_designs.pl - load one design from one database to another.
       --source-db       Name of source database, defaults to LIMS2_LIVE
       --dest-db         Name of destination database.
 
+IMPORTANT:
+The LIMS2_DBCONNECT_CONFIG env variable must be pointing to a config file with the details
+of the test database you are using.
+
 =head1 DESCRIPTION
 
 Transfer one design, plus all its associated data from one database to another.
