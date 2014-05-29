@@ -15,10 +15,10 @@ use Log::Log4perl ':easy';
 
 my $start_time=localtime;
 
-my $update_file = '/var/tmp/gene_list.xml';
+my $update_file = '/tmp/gene_list.xml';
 
 # Human data
-my $human_file = '/var/tmp/hgnc_list.txt';
+my $human_file = '/tmp/hgnc_list.txt';
 
 
 # get list of HGNC approved symbols and save it on the new file
@@ -31,7 +31,7 @@ close $HGNC;
 
 
 # Mouse data
-my $mouse_file = '/var/tmp/mgi_list.txt';
+my $mouse_file = '/tmp/mgi_list.txt';
 my $mouse_location = 'ftp://ftp.informatics.jax.org/pub/reports/MRK_ENSEMBL.rpt';
 
 
