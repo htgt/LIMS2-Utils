@@ -61,6 +61,10 @@ fixture_data_plate_well.pl - load plate from one database to another.
       --source-db       Name of source database, defaults to LIMS2_LIVE
       --dest-db         Name of destination database.
 
+IMPORTANT:
+The LIMS2_DBCONNECT_CONFIG env variable must be pointing to a config file with the details
+of the test database you are using.
+
 =head1 DESCRIPTION
 
 Transfer one plate, plus all its wells from one database to another.

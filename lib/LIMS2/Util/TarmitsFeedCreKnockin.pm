@@ -1,7 +1,7 @@
 package LIMS2::Util::TarmitsFeedCreKnockin;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::TarmitsFeedCreKnockin::VERSION = '0.031';
+    $LIMS2::Util::TarmitsFeedCreKnockin::VERSION = '0.033';
 }
 ## use critic
 
@@ -15,8 +15,6 @@ use Const::Fast;
 use EngSeqBuilder;
 use JSON;
 use LIMS2::Model::Util::EngSeqParams qw ( generate_well_eng_seq_params );
-
-# use Smart::Comments;
 
 has model => (
     is         => 'ro',
@@ -43,8 +41,8 @@ has es_clones => (
     lazy_build => 1,
 );
 
-# hashref to hold list of failed allele selects for display
-has failed_allele_selects => (
+# hashref to hold list of failed design selects for display
+has failed_design_selects => (
     is         => 'rw',
     isa        => 'HashRef',
     default    => sub { {} },
@@ -214,6 +212,8 @@ for my $name (
         counter_failed_tv_inserts
         counter_tv_rtp_updates
         counter_failed_tv_rtp_updates
+        counter_tv_allele_id_updates
+        counter_failed_tv_allele_id_updates
         counter_tv_ikmc_proj_id_updates
         counter_failed_tv_ikmc_proj_id_updates
         counter_failed_es_cell_selects
@@ -282,10 +282,10 @@ sub _build_es_clones {
     INFO "-------------- Select Totals -------------";
     INFO "Count of FAILED rows for Allele selects: "              .$self->counter_failed_no_dre_allele_selects;
 
-    my %failed_allele_selects_copy = %{ $self->failed_allele_selects };
-    foreach my $gene ( keys %failed_allele_selects_copy )
+    my %failed_design_selects_copy = %{ $self->failed_design_selects };
+    foreach my $gene ( keys %failed_design_selects_copy )
     {
-      INFO "Failed select for: Gene: $gene, Design ID: ".$failed_allele_selects_copy{$gene};
+      INFO "Failed Design select for: Gene: $gene, design ID: ".$failed_design_selects_copy{$gene};
     }
 
     INFO "Count of FAILED rows for Targeting vector selects: "    .$self->counter_failed_tv_selects;
@@ -320,10 +320,10 @@ sub check_clones_against_tarmits {
 
     # counters from selection of data from LIMS2
     INFO "Count of FAILED rows for Allele select: "                                   .$self->counter_failed_no_dre_allele_selects;
-    my %failed_allele_selects_copy = %{ $self->failed_allele_selects };
-    foreach my $gene ( keys %failed_allele_selects_copy )
+    my %failed_design_selects_copy = %{ $self->failed_design_selects };
+    foreach my $gene ( keys %failed_design_selects_copy )
     {
-      INFO "FAILED the select Gene: $gene, Design ID: ".$failed_allele_selects_copy{$gene};
+      INFO "FAILED design select Gene: $gene, design ID: ".$failed_design_selects_copy{$gene};
     }
     INFO "Count of FAILED rows for Targeting vector selects: "                        .$self->counter_failed_tv_selects;
     INFO "Count of FAILED rows for ES Cell clone selects: "                           .$self->counter_failed_es_cell_selects;
@@ -358,9 +358,11 @@ sub check_clones_against_tarmits {
     INFO "Count of rows where Targeting vector not found in Tarmits: "                .$self->counter_not_found_tvs;
     INFO "Count of rows where Targeting vector was inserted: "                        .$self->counter_tv_inserts;
     INFO "Count of rows where Targeting vector report to public flag was updated: "   .$self->counter_tv_rtp_updates;
+    INFO "Count of rows where Targeting vector allele ID was updated: "               .$self->counter_tv_allele_id_updates;
     INFO "Count of rows where Targeting vector ikmc project ID was updated: "         .$self->counter_tv_ikmc_proj_id_updates;
     INFO "---";
     INFO "Count of FAILED rows for Targeting vector report to public flag updates: "  .$self->counter_tv_rtp_updates;
+    INFO "Count of FAILED rows for Targeting vector allele ID updates: "              .$self->counter_failed_tv_allele_id_updates;
     INFO "Count of FAILED rows for Targeting vector ikmc project ID updates: "        .$self->counter_failed_tv_ikmc_proj_id_updates;
     INFO "Count of FAILED rows for Targeting vector inserts: "                        .$self->counter_failed_tv_inserts;
     INFO "-------------------";
@@ -387,6 +389,7 @@ sub check_clones_against_tarmits {
 sub _check_gene_against_tarmits {
     my ( $self ) = @_;
 
+    DEBUG "====================== gene ============================";
     DEBUG "Checking gene MGI ID: ".$self->curr_gene_mgi_id;
 
     for my $design_id ( sort keys %{ $self->es_clones->{ $self->curr_gene_mgi_id }->{ 'designs' } } ) {
@@ -395,16 +398,19 @@ sub _check_gene_against_tarmits {
         # initialise fields
         $self->curr_design ( undef );
 
-        $self->_check_allele_against_tarmits();
+        $self->_check_design_against_tarmits();
     }
+
+    DEBUG "==================== end gene ============================";
 
     return;
 }
 
-sub _check_allele_against_tarmits {
+sub _check_design_against_tarmits {
     my ( $self ) = @_;
 
-    DEBUG "Design = ".$self->curr_design_id.":";
+    DEBUG "-----------------------design-----------------------------";
+    DEBUG "Processing Design ID: ".$self->curr_design_id;
 
     $self->curr_design( $self->es_clones->{ $self->curr_gene_mgi_id }->{ 'designs' }->{ $self->curr_design_id } );
 
@@ -413,45 +419,66 @@ sub _check_allele_against_tarmits {
         return;
     }
 
-    $self->_check_for_existing_no_dre_allele();
-    $self->_check_for_existing_dre_allele();
-
-    unless ( defined $self->curr_allele_no_dre_id && defined $self->curr_allele_dre_id ) {
-        ERROR "Failed to get alleles, cannot continue down to targeting vectors for gene ID: ".$self->curr_gene_mgi_id;
-        return;
-    }
-
-    INFO $self->curr_gene_mgi_id.": No Dre Allele ID: ".$self->curr_allele_no_dre_id;
-    INFO $self->curr_gene_mgi_id.": Dre Allele ID: ".$self->curr_allele_dre_id;
-
     # Cycle through the targeting vectors in the allele
     for my $targeting_vector_name ( sort keys %{ $self->es_clones->{ $self->curr_gene_mgi_id }->{ 'designs' }->{ $self->curr_design_id }->{ 'targeting_vectors' } } ) {
         $self->curr_targeting_vector_name ( $targeting_vector_name );
+
+        DEBUG "-----------------------vector-----------------------------";
+        DEBUG "Processing Targeting vector: ".$targeting_vector_name;
 
         # initialise fields
         $self->curr_targeting_vector( undef );
         $self->curr_targeting_vector_id ( undef );
 
+        # for each targeting vector with accepted clones (dre or no-dre) within the design return existing id or insert a new allele
+        my $curr_vector_hash = $self->es_clones->{ $self->curr_gene_mgi_id }->{ 'designs' }->{ $self->curr_design_id }->{ 'targeting_vectors' }->{ $targeting_vector_name };
+
+        $self->curr_allele_dre_id ( undef );
+        $self->curr_allele_no_dre_id ( undef );
+
+        # NON-dre allele should always be checked/created as the targeting vector connects to that allele
+        $self->_check_for_existing_no_dre_allele( $curr_vector_hash );
+        unless ( defined $self->curr_allele_no_dre_id ) {
+            ERROR "Failed to determine id for no dre allele, for gene ID: ".$self->curr_gene_mgi_id;
+            return;
+        }
+        INFO $self->curr_gene_mgi_id.": No Dre Allele ID: ".$self->curr_allele_no_dre_id;
+
+        # dre allele optional and only created if we have dre clones
+        if ( $curr_vector_hash->{ 'count_clones_dre' } > 0 ) {
+            $self->_check_for_existing_dre_allele( $curr_vector_hash );
+            unless ( defined $self->curr_allele_dre_id ) {
+                ERROR "Failed to determine id for no dre allele, for gene ID: ".$self->curr_gene_mgi_id;
+                return;
+            }
+            INFO $self->curr_gene_mgi_id.": Dre Allele ID: ".$self->curr_allele_dre_id;
+        }
+
         # drill down to check targeting vector
         $self->_check_targeting_vector_against_tarmits();
+
+        DEBUG "---------------------end vector-----------------------------";
     }
+
+    DEBUG "---------------------end design-----------------------------";
 
     return;
 }
 
 sub _check_for_existing_no_dre_allele {
-    my ( $self ) = @_;
+    my ( $self, $curr_vector_hash ) = @_;
 
     # initialise fields
-    $self->curr_allele_no_dre_id ( undef );
     $self->curr_allele_no_dre_genbank_exists ( 0 );
     $self->curr_allele_no_dre_genbank_db_id ( undef );
     $self->curr_allele_no_dre_genbank_checked ( 0 );
     $self->curr_allele_no_dre_genbank_vector_checked ( 0 );
 
-    my $cassette = $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' };
+    DEBUG "Cassette: " . $curr_vector_hash->{ 'cassette' };
+    DEBUG "Backbone: " . $curr_vector_hash->{ 'backbone' };
 
-    my $find_no_dre_allele_results = $self->_check_for_existing_allele( $cassette );
+    # my $find_no_dre_allele_results = $self->_check_for_existing_allele( $cassette );
+    my $find_no_dre_allele_results = $self->_check_for_existing_allele( $curr_vector_hash->{ 'cassette' }, $curr_vector_hash->{ 'backbone' } );
 
     if ( defined $find_no_dre_allele_results && scalar @{ $find_no_dre_allele_results } > 0 ) {
 
@@ -471,7 +498,7 @@ sub _check_for_existing_no_dre_allele {
         # did not find allele in Tarmits, insert it
         $self->inc_counter_not_found_no_dre_alleles;
 
-        $self->_insert_no_dre_allele ();
+        $self->_insert_no_dre_allele ( $curr_vector_hash->{ 'cassette' }, $curr_vector_hash->{ 'backbone' }, $curr_vector_hash->{ 'cassette_type' } );
 
         if( defined $self->curr_allele_no_dre_id ) {
             DEBUG "The no dre allele ID after insert: ".$self->curr_allele_no_dre_id;
@@ -485,19 +512,20 @@ sub _check_for_existing_no_dre_allele {
 }
 
 sub _check_for_existing_dre_allele {
-    my ( $self ) = @_;
+    my ( $self, $curr_vector_hash ) = @_;
 
     # initialise fields
-    $self->curr_allele_dre_id ( undef );
     $self->curr_allele_dre_genbank_exists ( 0 );
     $self->curr_allele_dre_genbank_db_id ( undef );
     $self->curr_allele_dre_genbank_checked ( 0 );
 
-    # add cassette suffix
-    my $cassette = $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' };
-    $cassette = $cassette.'_dre';
+    # add cassette dre suffix
+    my $modified_cassette = $curr_vector_hash->{ 'cassette' } .'_dre';
 
-    my $find_dre_allele_results = $self->_check_for_existing_allele( $cassette );
+    DEBUG "Cassette: " . $modified_cassette;
+    DEBUG "Backbone: " . $curr_vector_hash->{ 'backbone' };
+
+    my $find_dre_allele_results = $self->_check_for_existing_allele( $modified_cassette, $curr_vector_hash->{ 'backbone' } );
 
     if ( defined $find_dre_allele_results && scalar @{ $find_dre_allele_results } > 0 ) {
 
@@ -517,7 +545,7 @@ sub _check_for_existing_dre_allele {
         # did not find allele in Tarmits, insert it
         $self->inc_counter_not_found_dre_alleles;
 
-        $self->_insert_dre_allele();
+        $self->_insert_dre_allele( $modified_cassette, $curr_vector_hash->{ 'backbone' }, $curr_vector_hash->{ 'cassette_type' } );
 
         if( defined $self->curr_allele_dre_id ) {
             DEBUG "The dre allele ID after insert: ".$self->curr_allele_dre_id;
@@ -530,7 +558,7 @@ sub _check_for_existing_dre_allele {
 }
 
 sub _check_for_existing_allele {
-    my ( $self, $cassette ) = @_;
+    my ( $self, $cassette, $backbone ) = @_;
 
     # Create selection criteria hash to be used to determine if the allele already exists in Tarmits
     my $find_allele_params = {
@@ -540,7 +568,7 @@ sub _check_for_existing_allele {
         'chromosome_eq'            => $self->curr_design->{ 'design_details' }->{ 'genomic_position' }->{ 'chromosome' },
         'strand_eq'                => $self->curr_design->{ 'design_details' }->{ 'genomic_position' }->{ 'strand' },
         'cassette_eq'              => $cassette,
-        'backbone_eq'              => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'backbone' },
+        'backbone_eq'              => $backbone,
         'homology_arm_start_eq'    => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'homology_arm' }->{ 'start' },
         'homology_arm_end_eq'      => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'homology_arm' }->{ 'end' },
         'cassette_start_eq'        => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'cassette' }->{ 'start' },
@@ -561,13 +589,11 @@ sub _check_for_existing_allele {
 }
 
 sub _insert_no_dre_allele {
-    my ( $self ) = @_;
+    my ( $self, $cassette, $backbone, $cassette_type ) = @_;
 
     DEBUG "Inserting no Dre allele";
 
-    my $cassette = $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' };
-
-    my $insert_allele_params = $self->_generate_insert_allele_params( $cassette );
+    my $insert_allele_params = $self->_generate_insert_allele_params( $cassette, $backbone, $cassette_type );
 
     try {
         my $insert_allele_results = $self->tm->create_allele( $insert_allele_params );
@@ -594,14 +620,11 @@ sub _insert_no_dre_allele {
 }
 
 sub _insert_dre_allele {
-    my ( $self ) = @_;
+    my ( $self, $modified_cassette, $backbone, $cassette_type ) = @_;
 
     DEBUG "Inserting Dre allele";
 
-    my $cassette = $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette' };
-    my $modified_cassette = $cassette.'_dre';
-
-    my $insert_allele_params = $self->_generate_insert_allele_params( $modified_cassette );
+    my $insert_allele_params = $self->_generate_insert_allele_params( $modified_cassette, $backbone, $cassette_type );
 
     try {
         my $insert_allele_results = $self->tm->create_allele( $insert_allele_params );
@@ -627,7 +650,7 @@ sub _insert_dre_allele {
 }
 
 sub _generate_insert_allele_params {
-    my ( $self, $cassette ) = @_;
+    my ( $self, $cassette, $backbone, $cassette_type ) = @_;
 
     DEBUG "Inserting allele";
 
@@ -638,12 +661,12 @@ sub _generate_insert_allele_params {
         'chromosome'               => $self->curr_design->{ 'design_details' }->{ 'genomic_position' }->{ 'chromosome' },
         'strand'                   => $self->curr_design->{ 'design_details' }->{ 'genomic_position' }->{ 'strand' },
         'cassette'                 => $cassette,
-        'backbone'                 => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'backbone' },
+        'backbone'                 => $backbone,
         'homology_arm_start'       => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'homology_arm' }->{ 'start' },
         'homology_arm_end'         => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'homology_arm' }->{ 'end' },
         'cassette_start'           => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'cassette' }->{ 'start' },
         'cassette_end'             => $self->curr_design->{ 'design_details' }->{ 'molecular_co_ords' }->{ 'cassette' }->{ 'end' },
-        'cassette_type'            => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'cassette_type' },
+        'cassette_type'            => $cassette_type,
         'mutation_type_name'       => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'mutation_type' },
         'mutation_method_name'     => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'mutation_method' },
         'floxed_start_exon'        => $self->curr_design->{ 'design_details' }->{ 'mutation_details' }->{ 'floxed_start_exon' },
@@ -698,15 +721,28 @@ sub _check_targeting_vector_against_tarmits {
 
         # if force updates is on
         if ( $self->force_updates ) {
+
+            # check whether the targeting vector is connected to the correct allele; if not update it
+            my $current_tv_allele_id = $tv_find_results->[0]->{ 'allele_id' };
+
+            if( $current_tv_allele_id != $self->curr_allele_no_dre_id ) {
+                DEBUG "Targeting vectors current allele ID <" . $current_tv_allele_id . "> does not match expected ID <" . $self->curr_allele_no_dre_id . ">, update it";
+                unless ( $self->_update_targ_vect_allele_id() ) {
+                    ERROR "Failed to update targeting vector allele id for vector name: ".$self->curr_targeting_vector_name;
+                    # do not continue down to clones for this targeting vector
+                    return;
+                }
+            }
+
             # update the ikmc project ID for this targeting vector
-            if (!$self->_update_targ_vect_ikmc_project_id() ) {
+            unless ( $self->_update_targ_vect_ikmc_project_id() ) {
                 ERROR "Failed to update targeting vector ikmc project id for vector name: ".$self->curr_targeting_vector_name;
             }
         }
 
         # check targeting vectors report to public flag matches that in LIMS2
         if ( $tv_find_results->[0]->{ 'report_to_public' } == 0 ) {
-            if ( !$self->_update_targ_vect_report_to_public_flag() ) {
+            unless ( $self->_update_targ_vect_report_to_public_flag() ) {
                 ERROR "Failed to update targeting vector report to public flag for vector name: ".$self->curr_targeting_vector_name;
                 # do not continue down to clones for this targeting vector
                 return;
@@ -720,7 +756,7 @@ sub _check_targeting_vector_against_tarmits {
         $self->curr_targeting_vector_id ( $self->_insert_targeting_vector() );
     }
 
-    if ( !$self->curr_targeting_vector_id ) {
+    unless ( $self->curr_targeting_vector_id ) {
         # do not continue down to clones for this targeting vector
         return;
     }
@@ -728,8 +764,11 @@ sub _check_targeting_vector_against_tarmits {
     INFO "Processing ES clones in targeting vector ID:".$self->curr_targeting_vector_id;
 
     # cycle through each clone for the targeting vector
-    for my $curr_clone_name ( sort keys %{ $self->es_clones->{ $self->curr_gene_mgi_id }->{ 'designs' }->{ $self->curr_design_id }->{ 'targeting_vectors' }->{ $self->curr_targeting_vector_name }->{ 'clones' } } ) {
+    for my $curr_clone_name ( sort keys %{ $self->curr_targeting_vector->{ 'clones' } } ) {
         $self->curr_clone_name ( $curr_clone_name );
+
+        DEBUG "- - - - - - - - - - - es cell - - - - - - - - - - - - - - -";
+        DEBUG "Checking es cell with clone name : " . $curr_clone_name;
 
         # initialise fields
         $self->curr_es_cell_clone_id( undef );
@@ -739,9 +778,45 @@ sub _check_targeting_vector_against_tarmits {
 
         # check each es cell clone
         $self->_check_es_cell_against_tarmits();
+
+        DEBUG "- - - - - - - - - - end es cell - - - - - - - - - - - - - -";
     }
 
     return;
+}
+
+sub _update_targ_vect_allele_id {
+    my ( $self ) = @_;
+
+    my $update_ok = 0;
+
+    my $new_allele_id = $self->curr_allele_no_dre_id;
+
+    try {
+        my $update_allele_id_params = {
+            'allele_id' => $new_allele_id,
+        };
+
+        # update takes the id of the item plus the updated parameters
+        my $tv_update_results = $self->tm->update_targeting_vector( $self->curr_targeting_vector_id, $update_allele_id_params );
+
+        if ( defined $tv_update_results && ( $tv_update_results->{ 'id' } == $self->curr_targeting_vector_id ) ) {
+            $self->inc_counter_tv_allele_id_updates;
+            INFO "Updated targeting vector ID: ".$self->curr_targeting_vector_id." allele ID to: ".$new_allele_id;
+            $update_ok = 1;
+        }
+        else {
+            $self->inc_counter_failed_tv_allele_id_updates;
+            DEBUG "FAILED Check on update of targeting vector allele ID failed for gene ID: ".$self->curr_gene_mgi_id.", design: ".$self->curr_design_id.", targeting vector: ".$self->curr_targeting_vector_name.", targeting vector id: ".$self->curr_targeting_vector_id;
+        }
+    }
+    catch {
+        $self->inc_counter_failed_tv_allele_id_updates;
+        ERROR "FAILED Targeting vector allele ID update for gene ID: ".$self->curr_gene_mgi_id.", design: ".$self->curr_design_id.", targeting vector: ".$self->curr_targeting_vector_name;
+        ERROR "Exception: ".$_;
+    };
+
+    return $update_ok;
 }
 
 sub _update_targ_vect_ikmc_project_id {
@@ -819,7 +894,7 @@ sub _insert_targeting_vector {
     DEBUG "No targeting vector match, inserting new one";
 
     # set up targeting vector insert parameters
-    # insert targeting vector against no-dre allele
+    # NB insert targeting vector against no-dre allele only
     my $insert_tv_params = {
         'name'                  => $self->curr_targeting_vector_name,
         'allele_id'             => $self->curr_allele_no_dre_id,
@@ -862,7 +937,8 @@ sub _select_or_create_ikmc_project_id {
     # a legacy project id may already exist
     $ikmc_proj_id = $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'ikmc_project_id' };
 
-    # if no legacy project id found, create a new one, ( N.B. always use the no dre allele ID )
+    # if no legacy project id found, create a new one, 
+    # N.B. always use the no dre allele ID for the ikmc project id
     unless ( defined $ikmc_proj_id && $ikmc_proj_id ne '' ) {
         $ikmc_proj_id = ( $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'pipeline_name' } ).'_'.$self->curr_allele_no_dre_id;
     }
@@ -881,13 +957,12 @@ sub _check_es_cell_against_tarmits {
     $self->curr_clone ( $self->es_clones->{ $self->curr_gene_mgi_id }->{ 'designs' }->{ $self->curr_design_id }->{ 'targeting_vectors' }->{ $self->curr_targeting_vector_name }->{ 'clones' }->{ $self->curr_clone_name } );
     $self->curr_clone_accepted ( $self->curr_clone->{ 'info' }->{ 'clone_accepted' } );
 
-    my $ep_recomb = $self->curr_clone->{ 'es_cell_details' }->{ 'ep_recombinase' };
-    if ( defined $ep_recomb && $ep_recomb eq 'Dre' ) {
-        DEBUG "Current clone has Dre";
+    if ( exists $self->curr_clone->{ 'es_cell_details' }->{ 'ep_recombinase' } && ( $self->curr_clone->{ 'es_cell_details' }->{ 'ep_recombinase' } eq 'Dre' ) ) {
         $self->curr_clone_has_dre ( 1 );
+        DEBUG "Clone has Dre";
     }
     else {
-        DEBUG "Current clone does not have Dre";
+        DEBUG "Clone does not have Dre";
     }
 
     # List of unique clone parameters for select
@@ -908,14 +983,35 @@ sub _check_es_cell_against_tarmits {
 
         # fetch es cell clone id
         $self->curr_es_cell_clone_id ( $clone_find_results->[0]->{ 'id' } );
-        my $curr_allele_id = $clone_find_results->[0]->{ 'allele_id' };
+        my $clone_curr_db_allele_id = $clone_find_results->[0]->{ 'allele_id' };
 
         if ( defined  $self->curr_es_cell_clone_id ) {
             DEBUG "Found ES cell clone match, ID: ".$self->curr_es_cell_clone_id;
         }
 
-        # if force updates is on
+        # optional forced updates
         if ( $self->force_updates ) {
+            DEBUG "Force updates: checking whether need to update allele ID";
+            DEBUG "Force updates: clone has current database allele id : " . $clone_curr_db_allele_id;
+            if( $self->curr_allele_dre_id ) { DEBUG "Force updates: calculated dre allele id : " . $self->curr_allele_dre_id; }
+            if( $self->curr_allele_no_dre_id ) { DEBUG "Force updates: calculated NON dre allele id : " . $self->curr_allele_no_dre_id; }
+
+            if ( $self->curr_clone_has_dre && ( $clone_curr_db_allele_id != $self->curr_allele_dre_id ) ) {
+                DEBUG "Identified need to update allele ID from " . $clone_curr_db_allele_id . " to dre allele id " . $self->curr_allele_dre_id;
+                # need to update clone allele ID as pointing at the wrong allele
+                unless ( $self->_update_clone_allele_id( $self->curr_allele_dre_id ) ) {
+                    ERROR "Failed to update es cell clone allele id for clone name: " . $self->curr_clone_name;
+                }
+            }
+
+            if ( !$self->curr_clone_has_dre && ( $clone_curr_db_allele_id != $self->curr_allele_no_dre_id ) ) {
+                DEBUG "Identified need to update allele ID from " . $clone_curr_db_allele_id . " to NON dre allele id " . $self->curr_allele_no_dre_id;
+                # need to update clone allele ID as pointing at the wrong allele
+                unless ( $self->_update_clone_allele_id( $self->curr_allele_no_dre_id ) ) {
+                    ERROR "Failed to update es cell clone allele id for clone name: " . $self->curr_clone_name;
+                }
+            }
+
             DEBUG "Force updates: updating ikmc project ID";
 
             # update the ikmc project ID for this es cell clone
@@ -928,21 +1024,6 @@ sub _check_es_cell_against_tarmits {
             #   update the allele symbol superscript
             if (!$self->_update_clone_allele_symbol_superscript() ) {
                 ERROR "Failed to update es cell clone allele symbol superscript for clone name: ".$self->curr_clone_name;
-            }
-
-            DEBUG "Force updates: checking whether need to update allele ID";
-
-            # check the clone is linked to the correct allele ID: if clone is Dre'd but attached to no-Dre allele update it
-            if ( $self->curr_clone_has_dre && ( $curr_allele_id eq $self->curr_allele_no_dre_id ) ) {
-                DEBUG "Identified need to update allele ID from ".$curr_allele_id." to ".$self->curr_allele_dre_id;
-
-                # need to update clone allele ID as pointing at the wrong allele
-                if( !$self->_update_clone_allele_id() ) {
-                    ERROR "Failed to update es cell clone allele id for clone name: ".$self->curr_clone_name;
-                }
-                else {
-                    DEBUG "Updated allele ID successfully";
-                }
             }
         }
 
@@ -1097,15 +1178,15 @@ sub _update_clone_allele_symbol_superscript {
 }
 
 sub _update_clone_allele_id {
-    my ( $self ) = @_;
+    my ( $self, $new_allele_id ) = @_;
 
     my $update_ok = 0;
 
-    # using this method because the clone has been incorrectly linked to the no dre allele ID when it should be linked to the Dre allele ID
+    # using this method because the clone has been incorrectly linked to the wrong allele
 
     try {
         my $update_clone_params = {
-            'allele_id' => $self->curr_allele_dre_id,
+            'allele_id'           => $new_allele_id,
         };
 
         # update takes the id of the item plus the updated parameters
@@ -1113,7 +1194,7 @@ sub _update_clone_allele_id {
 
         if ( defined $clone_update_resultset && ( $clone_update_resultset->{ 'id' } == $self->curr_es_cell_clone_id ) ) {
             $self->inc_counter_es_cell_allele_id_updates;
-            INFO "Updated allele ID for ES cell clone ID: ".$self->curr_es_cell_clone_id." to value: ".$self->curr_allele_dre_id.", continuing";
+            INFO "Updated allele ID for ES cell clone ID: " . $self->curr_es_cell_clone_id . " to value: " . $new_allele_id;
             $update_ok = 1;
         }
         else {
@@ -1737,15 +1818,15 @@ sub _refactor_selected_clones {
 
         next RESULTS_LOOP if $is_error;
 
-        # if current design id (allele) doesn't exist in hash then add it
+        my $curr_gene_hash = $results_refactored{ $current_gene_id };
+
+        # if current design id doesn't exist in hash then add it
         my $current_design_id = $result->{ 'design_id' };
 
-        my $design_exists = exists $results_refactored{ $current_gene_id }->{ 'designs' }->{ $current_design_id };
-
-        unless ( exists $results_refactored{ $current_gene_id }->{ 'designs' }->{ $current_design_id } ) {
+        unless ( exists $curr_gene_hash->{ 'designs' }->{ $current_design_id } ) {
 
             #skip if already im error list
-            next RESULTS_LOOP if ( exists $self->failed_allele_selects->{ $current_gene_id } );
+            next RESULTS_LOOP if ( exists $self->failed_design_selects->{ $current_gene_id } );
 
             try {
 
@@ -1758,15 +1839,15 @@ sub _refactor_selected_clones {
 
                 # build design details hash and add it into main hash
                 my $design_details = $self->_select_lims2_design_details ( $result, $design_info, $design_oligos );
-                $results_refactored{ $current_gene_id }->{ 'designs' }->{ $current_design_id }->{ 'design_details' } = $design_details;
+                $curr_gene_hash->{ 'designs' }->{ $current_design_id }->{ 'design_details' } = $design_details;
 
             } catch {
                 $self->inc_counter_failed_no_dre_allele_selects;
-                WARN "FAILED Allele selection for gene: ".$result->{ 'design_gene_id' }." design: ". $result->{ 'design_id' };
+                WARN "FAILED Design selection for gene: ".$result->{ 'design_gene_id' }." and design id: ". $result->{ 'design_id' };
                 TRACE "Exception: ".$_;
 
-                # add details tp failed hash for report
-                $self->failed_allele_selects->{ $current_gene_id } = $current_design_id;
+                # add details to failed hash for report
+                $self->failed_design_selects->{ $current_gene_id } = $current_design_id;
 
                 # set flag to trigger next loop cycle (cannot next here as out of scope)
                 $is_error = 1;
@@ -1775,30 +1856,48 @@ sub _refactor_selected_clones {
 
         next RESULTS_LOOP if $is_error;
 
+        my $curr_design_hash = $curr_gene_hash->{ 'designs' }->{ $current_design_id };
+
         # if vector info doesn't exist in allele hash then add it
         my $targeting_vector_id = $result->{ 'targeting_vector_plate_name' }.'_'.$result->{ 'targeting_vector_well_name' };
         my $intermediate_vector_id = $result->{ 'int_plate_name' }.'_'.$result->{ 'int_well_name' };
 
-        unless ( exists $results_refactored{ $current_gene_id }->{ 'designs' }->{ $current_design_id }->{ 'targeting_vectors' }->{ $targeting_vector_id } ) {
-
-            my $new_tar_vec = $self->_select_lims2_targeting_vector_details ( $result, $targeting_vector_id, $intermediate_vector_id );
-            $results_refactored{ $current_gene_id }->{ 'designs' }->{ $current_design_id }->{ 'targeting_vectors' }->{ $targeting_vector_id } = $new_tar_vec;
+        unless ( exists $curr_design_hash->{ 'targeting_vectors' }->{ $targeting_vector_id } ) {
+            my $targ_vector_details = $self->_select_lims2_targeting_vector_details ( $result, $targeting_vector_id, $intermediate_vector_id );
+            $curr_design_hash->{ 'targeting_vectors' }->{ $targeting_vector_id } = $targ_vector_details;
         }
 
         next RESULTS_LOOP if $is_error;
 
-        # fetch clone id
-        my $es_clone_id = $result->{ 'clone_plate_name' }.'_'.$result->{ 'clone_well_name' };
+        my $curr_targ_vector_hash = $curr_design_hash->{ 'targeting_vectors' }->{ $targeting_vector_id };
 
-        # if the clone does not already exist in the main hash then add it
-        unless ( exists $results_refactored{ $current_gene_id }->{ 'designs' }->{ $current_design_id }->{ 'targeting_vectors' }->{ $targeting_vector_id }->{ 'clones' }->{ $es_clone_id } ) {
+        # create clone id
+        my $es_clone_id = ( $result->{ 'clone_plate_name' } ) . '_' . ( $result->{ 'clone_well_name' } );
 
+        # if the clone does not already exist in the main hash then add it in
+        unless ( exists $curr_targ_vector_hash->{ 'clones' }->{ $es_clone_id } ) {
             my $new_clone = $self->_select_lims2_es_clone_details ( $result, $es_clone_id, $targeting_vector_id );
-            $results_refactored{ $current_gene_id }->{ 'designs' }->{ $current_design_id }->{ 'targeting_vectors' }->{ $targeting_vector_id }->{ 'clones' }->{ $es_clone_id } = $new_clone;
+            $curr_targ_vector_hash->{ 'clones' }->{ $es_clone_id } = $new_clone;
+
+            $self->_increment_vector_counters( $result->{ 'ep_recombinase' }, $es_clone_id, $curr_targ_vector_hash );
         }
     }
 
     return \%results_refactored;
+}
+
+# count accepted clones for targeting vector for use when deciding whether to insert alleles
+sub _increment_vector_counters {
+    my ( $self, $ep_recombinase, $es_clone_id, $curr_targ_vector_hash ) = @_;
+
+    if ( $ep_recombinase eq 'Dre' ) {
+        $curr_targ_vector_hash->{ 'count_clones_dre' } += 1;
+    }
+    else {
+        $curr_targ_vector_hash->{ 'count_clones_no_dre' } += 1;
+    }
+
+    return;
 }
 
 sub _select_lims2_design_details {
@@ -1842,23 +1941,6 @@ sub _select_lims2_design_details {
 
     #   Mutation type     - e.g. Cre Knock In            -> hardcoded
     $new_mutation_details{ 'mutation_type' }      = 'Cre Knock In'; #change this for any deletions?
-
-    #   Mutation subtype  -                              -> not set
-    #$new_mutation_details{ 'mutation_subtype' }   = undef;
-
-    #   Cassette          - e.g. pL1L2_GT0_LF2A          -> summaries.final_pick_cassette_name
-    $new_mutation_details{ 'cassette' }           = $result->{ 'vector_cassette_name' };
-
-    #   Cassette Type     - e.g. Promotorless            -> cassettes.promoter
-    if ( $result->{ 'vector_cassette_promotor' } ) {
-      $new_mutation_details{ 'cassette_type' }    = 'Promotor Driven';
-    }
-    else {
-      $new_mutation_details{ 'cassette_type' }    = 'Promotorless';
-    }
-
-    #   Backbone          - e.g. L3L4_pD223_DTA_T_spec   -> summaries.final_pick_backbone_name
-    $new_mutation_details{ 'backbone' }           = $result->{ 'vector_backbone_name' };
 
     #   Floxed Exon                                     -> from designs.target_transcript
     $new_mutation_details{ 'floxed_start_exon' }  = $design_info->first_floxed_exon->stable_id;
@@ -1951,36 +2033,53 @@ sub _get_homology_arm_coords {
 sub _select_lims2_targeting_vector_details {
     my ( $self, $result, $targeting_vector_id, $intermediate_vector_id ) = @_;
 
-    my %new_tar_vec;
+    my %targ_vector_details;
 
-    $new_tar_vec{ 'info' }->{ 'targeting_vector_plate_id' }   = $result->{ 'targeting_vector_plate_id' };
-    $new_tar_vec{ 'info' }->{ 'targeting_vector_plate_name' } = $result->{ 'targeting_vector_plate_name' };
-    $new_tar_vec{ 'info' }->{ 'targeting_vector_well_id' }    = $result->{ 'targeting_vector_well_id' };
-    $new_tar_vec{ 'info' }->{ 'targeting_vector_well_name' }  = $result->{ 'targeting_vector_well_name' };
-    $new_tar_vec{ 'info' }->{ 'vector_cassette_promotor' }    = $result->{ 'vector_cassette_promotor' };
-    #$new_tar_vec{ '' }    = $result->{ '' };        
+    $targ_vector_details{ 'count_clones_no_dre'}             = 0;
+    $targ_vector_details{ 'count_clones_dre'}                = 0;
+
+    $targ_vector_details{ 'info' }->{ 'targeting_vector_plate_id' }   = $result->{ 'targeting_vector_plate_id' };
+    $targ_vector_details{ 'info' }->{ 'targeting_vector_plate_name' } = $result->{ 'targeting_vector_plate_name' };
+    $targ_vector_details{ 'info' }->{ 'targeting_vector_well_id' }    = $result->{ 'targeting_vector_well_id' };
+    $targ_vector_details{ 'info' }->{ 'targeting_vector_well_name' }  = $result->{ 'targeting_vector_well_name' };
+    $targ_vector_details{ 'info' }->{ 'vector_cassette_promotor' }    = $result->{ 'vector_cassette_promotor' };
+    #$targ_vector_details{ '' }    = $result->{ '' };        
 
     my %new_targeting_vectors;
     # Targeting Vectors (multiple rows)
     # Pipeline             - e.g. EUCOMMToolsCre          -> hardcoded
-    $new_targeting_vectors{ 'pipeline_name' }       = 'EUCOMMToolsCre';
-    $new_targeting_vectors{ 'pipeline_id' }         = 8;
+    $new_targeting_vectors{ 'pipeline_name' }           = 'EUCOMMToolsCre';
+    $new_targeting_vectors{ 'pipeline_id' }             = 8;
 
     # IKMC project ID      - e.g. 125168                  -> create this from pipeline and allele id if not found in LIMS2 e.g. EUCOMMToolsCre_23456
-    $new_targeting_vectors{ 'ikmc_project_id' }     = $result->{ 'htgt_project_id' };
+    $new_targeting_vectors{ 'ikmc_project_id' }         = $result->{ 'htgt_project_id' };
 
     # Targeting vector     - e.g. ETPG0008_Z_3_B03        -> from summaries.final_pick_plate_name and _well_name
-    $new_targeting_vectors{ 'targeting_vector' }    = $targeting_vector_id;
+    $new_targeting_vectors{ 'targeting_vector' }        = $targeting_vector_id;
 
     # Intermediate vector  - e.g. ETPCS0008_A_1_C03       -> from summaries.int_plate_name and _well_name
-    $new_targeting_vectors{ 'intermediate_vector' } = $intermediate_vector_id;
+    $new_targeting_vectors{ 'intermediate_vector' }     = $intermediate_vector_id;
 
     # Report to public     - e.g. boolean, tick or cross  -> set to true
-    $new_targeting_vectors{ 'report_to_public' }    = 1;
+    $new_targeting_vectors{ 'report_to_public' }        = 1;
 
-    $new_tar_vec{ 'targeting_vector_details' }      = { %new_targeting_vectors };
+    $targ_vector_details{ 'targeting_vector_details' }  = { %new_targeting_vectors };
 
-    return \%new_tar_vec;
+    #   Cassette          - e.g. pL1L2_GT0_LF2A          -> summaries.final_pick_cassette_name
+    $targ_vector_details{ 'cassette' }                  = $result->{ 'vector_cassette_name' };
+
+    #   Cassette Type     - e.g. Promotorless            -> cassettes.promoter
+    if ( $result->{ 'vector_cassette_promotor' } ) {
+      $targ_vector_details{ 'cassette_type' }           = 'Promotor Driven';
+    }
+    else {
+      $targ_vector_details{ 'cassette_type' }           = 'Promotorless';
+    }
+
+    #   Backbone          - e.g. L3L4_pD223_DTA_T_spec   -> summaries.final_pick_backbone_name
+    $targ_vector_details{ 'backbone' }                  = $result->{ 'vector_backbone_name' };
+
+    return \%targ_vector_details;
 }
 
 sub _select_lims2_es_clone_details {
@@ -2024,9 +2123,6 @@ sub _get_es_clone_cell_details {
 
     #   IKMC Project ID           - e.g. 125168                  -> create this from pipeline and allele id if not found in LIMS2 e.g. EUCOMMToolsCre_23456
     $es_cell_details{ 'ikmc_project_id' }               = $result->{ 'htgt_project_id' };
-
-    #   Report to public          - e.g. boolean, same as accepted flag so use that
-    #$es_cell_details{ 'report_to_public' }             = $result->{ 'clone_accepted' };
 
     # electroporation Recombinase ID
     $es_cell_details{ 'ep_recombinase' }                = $result->{ 'ep_recombinase' };
@@ -2262,6 +2358,7 @@ AND (
     )
 )
 AND s.ep_pick_well_id > 0
+
 GROUP by pr.project_id
 , pr.htgt_project_id
 , s.design_id
