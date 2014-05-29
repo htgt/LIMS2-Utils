@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.033     2014-05-29 15:13:04 Europe/London
+
+    update_gene_solr_index.pl fix to make it work in job-runner
+
 0.032     2014-05-28 09:59:20 Europe/London
 	Modfied the Tarmits feed to allow for multiple targeting vectors per design
 
