@@ -70,6 +70,7 @@ my %WriteMakefileArgs = (
     "MooseX::ClassAttribute" => 0,
     "MooseX::Log::Log4perl" => 0,
     "MooseX::SimpleConfig" => 0,
+    "MooseX::Types::Path::Class" => 0,
     "MooseX::Types::URI" => 0,
     "Path::Class" => 0,
     "Pod::Usage" => 0,
@@ -86,7 +87,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.032",
+  "VERSION" => "0.034",
   "test" => {
     "TESTS" => "t/*.t"
   }
