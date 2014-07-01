@@ -1,7 +1,7 @@
 package LIMS2::Util::WGE;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::WGE::VERSION = '0.034';
+    $LIMS2::Util::WGE::VERSION = '0.035';
 }
 ## use critic
 
@@ -14,6 +14,7 @@ use LIMS2::Exception;
 use Path::Class;
 use MooseX::Types::Path::Class;
 use Try::Tiny;
+use LIMS2::REST::Client;
 use namespace::autoclean;
 
 with qw( MooseX::Log::Log4perl );

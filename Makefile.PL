@@ -59,6 +59,7 @@ my %WriteMakefileArgs = (
     "LIMS2::Model::Util::DesignInfo" => 0,
     "LIMS2::Model::Util::DesignTargets" => 0,
     "LIMS2::Model::Util::EngSeqParams" => 0,
+    "LIMS2::REST::Client" => 0,
     "LIMS2::Test" => 0,
     "LWP::Simple" => 0,
     "LWP::UserAgent" => 0,
@@ -87,7 +88,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.034",
+  "VERSION" => "0.035",
   "test" => {
     "TESTS" => "t/*.t"
   }
