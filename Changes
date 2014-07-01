@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.035     2014-07-01 14:29:49 Europe/London
+
+    Bugfix: missing use statement
+
 0.034     2014-07-01 11:46:03 Europe/London
 
     Added LIMS2::Util::WGE
