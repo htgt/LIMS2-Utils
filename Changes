@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.034     2014-07-01 11:46:03 Europe/London
+
+    Added LIMS2::Util::WGE
+
 0.033     2014-05-29 15:13:04 Europe/London
 
     update_gene_solr_index.pl fix to make it work in job-runner
