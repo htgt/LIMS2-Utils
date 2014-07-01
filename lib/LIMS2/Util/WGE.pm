@@ -8,6 +8,7 @@ use LIMS2::Exception;
 use Path::Class;
 use MooseX::Types::Path::Class;
 use Try::Tiny;
+use LIMS2::REST::Client;
 use namespace::autoclean;
 
 with qw( MooseX::Log::Log4perl );
