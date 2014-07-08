@@ -931,7 +931,7 @@ sub _select_or_create_ikmc_project_id {
     # a legacy project id may already exist
     $ikmc_proj_id = $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'ikmc_project_id' };
 
-    # if no legacy project id found, create a new one, 
+    # if no legacy project id found, create a new one,
     # N.B. always use the no dre allele ID for the ikmc project id
     unless ( defined $ikmc_proj_id && $ikmc_proj_id ne '' ) {
         $ikmc_proj_id = ( $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'pipeline_name' } ).'_'.$self->curr_allele_no_dre_id;
@@ -1056,7 +1056,7 @@ sub _check_es_cell_against_tarmits {
         }
     }
 
-    # check the genbank files exist for the allele, if not insert them now we have a current alleles, 
+    # check the genbank files exist for the allele, if not insert them now we have a current alleles,
     # targeting vector and es cell clone
     unless ( defined $self->curr_es_cell_clone_id ) { return; }
 
@@ -1447,7 +1447,7 @@ sub _insert_or_update_dre_allele_clone_genbank_file {
         $genbank_data->{ 'allele_id' }          = $self->curr_allele_dre_id;
         $genbank_data->{ 'escell_clone' }       = $escell_bioseq_string;
 
-        # insert the allele genbank data and return the database ID  
+        # insert the allele genbank data and return the database ID
         my $db_id = $self->_insert_genbank_files( $genbank_data );
         $self->curr_allele_dre_genbank_db_id ( $db_id );
 
@@ -1565,7 +1565,7 @@ sub _insert_or_update_no_dre_allele_vector_and_clone_genbank_files {
             $self->_update_genbank_files_no_dre_vector_and_clone();
         }
         else {
-            # if vector already updated we still need to update clone 
+            # if vector already updated we still need to update clone
             if ( $self->curr_allele_no_dre_genbank_vector_checked ) {
 
                 # vector may already have been updated, safe to override with vector and clone
@@ -1937,8 +1937,13 @@ sub _select_lims2_design_details {
     $new_mutation_details{ 'mutation_type' }      = 'Cre Knock In'; #change this for any deletions?
 
     #   Floxed Exon                                     -> from designs.target_transcript
-    $new_mutation_details{ 'floxed_start_exon' }  = $design_info->first_floxed_exon->stable_id;
-    $new_mutation_details{ 'floxed_end_exon' }    = $design_info->last_floxed_exon->stable_id;
+    try {
+        $new_mutation_details{ 'floxed_start_exon' } = $design_info->first_floxed_exon->stable_id;
+        $new_mutation_details{ 'floxed_end_exon' }   = $design_info->last_floxed_exon->stable_id;
+    } catch {
+        WARN "FAILED to fetch floxed exons for gene: ".$self->curr_gene_mgi_id." design id: ". $self->curr_design_id;
+        WARN "Exception: ".$_;
+    };
 
     $design_details{ 'mutation_details' }         = { %new_mutation_details };
 
@@ -2037,7 +2042,7 @@ sub _select_lims2_targeting_vector_details {
     $targ_vector_details{ 'info' }->{ 'targeting_vector_well_id' }    = $result->{ 'targeting_vector_well_id' };
     $targ_vector_details{ 'info' }->{ 'targeting_vector_well_name' }  = $result->{ 'targeting_vector_well_name' };
     $targ_vector_details{ 'info' }->{ 'vector_cassette_promotor' }    = $result->{ 'vector_cassette_promotor' };
-    #$targ_vector_details{ '' }    = $result->{ '' };        
+    #$targ_vector_details{ '' }    = $result->{ '' };
 
     my %new_targeting_vectors;
     # Targeting Vectors (multiple rows)
@@ -2379,7 +2384,7 @@ GROUP by pr.project_id
 , s.ep_first_cell_line_name
 , s.ep_well_recombinase_id
 , s.ep_pick_plate_name
-, s.ep_pick_plate_id 
+, s.ep_pick_plate_id
 , s.ep_pick_well_name
 , s.ep_pick_well_id
 , s.ep_pick_well_accepted
