@@ -1,7 +1,7 @@
 package LIMS2::Template::Plugin::PasswordGenerator;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Template::Plugin::PasswordGenerator::VERSION = '0.036';
+    $LIMS2::Template::Plugin::PasswordGenerator::VERSION = '0.037';
 }
 ## use critic
 
