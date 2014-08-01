@@ -38,7 +38,9 @@ sub _build_traceserver {
     };
 
     #oracle stuff breaks the sig int handler, reset it here
+    ## no critic(RequireLocalizedPunctuationVars)
     $SIG{INT} = 'DEFAULT';
+    ## use critic
 
     return $ts;
 }
@@ -93,8 +95,12 @@ sub write_temp_file {
 sub print_trace {
     my ( $self, $outfile,  $trace_data ) = @_;
 
-    open my $out, '>:raw', $outfile;
+    open my $out, '>:raw', $outfile or die "Couldn't open $outfile";
     print $out $trace_data;
+
+    close $out;
+
+    return;
 }
 
 __PACKAGE__->meta->make_immutable;
@@ -111,29 +117,7 @@ LIMS2::Util::TraceServer
 
 =head1 DESCRIPTION
 
-Helper module for submitting errbit errors from catalyst. If an error occurs it will be added
-to the errors arrayref passed to submit_errors.
-
-You must set the LIMS2_ERRBIT_CONFIG to a config file.
-
-=head1 SYNOPSIS
-
-  use LIMS2::Util::Errbit;
-
-  #then within a catalyst method:
-
-  my $errbit = LIMS2::Util::Errbit->new_with_config;
-
-  #make a copy of the errors as we modify them
-  my @errors = @{ $c->error };
-
-  try {
-    #requires catalyst object and list of errors.
-    $errbit->submit_errors( $c, \@errors );
-  }
-  catch {
-    $c->log->error( @_ );
-  };
+Helper module for using the TraceServer perl wrapper. TraceServer.pm must be in your perl5lib (it sits inside the oracle installation in /software for some reason)
 
 =head1 AUTHOR
 
