@@ -80,6 +80,7 @@ my %WriteMakefileArgs = (
     "Sub::Exporter" => 0,
     "Template" => 0,
     "Template::Plugin" => 0,
+    "TraceServer" => 0,
     "Try::Tiny" => 0,
     "URI" => 0,
     "YAML::Any" => 0,
@@ -88,7 +89,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.037",
+  "VERSION" => "0.038",
   "test" => {
     "TESTS" => "t/*.t"
   }

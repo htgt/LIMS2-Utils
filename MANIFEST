@@ -27,6 +27,7 @@ lib/LIMS2/Util/Solr.pm
 lib/LIMS2/Util/Tarmits.pm
 lib/LIMS2/Util/TarmitsFeedCreKnockin.pm
 lib/LIMS2/Util/TestDatabase.pm
+lib/LIMS2/Util/TraceServer.pm
 lib/LIMS2/Util/WGE.pm
 lib/LIMS2/Util/YAMLIterator.pm
 t/00-compile.t

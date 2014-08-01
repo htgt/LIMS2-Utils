@@ -63,6 +63,7 @@ requires:
   Sub::Exporter: 0
   Template: 0
   Template::Plugin: 0
+  TraceServer: 0
   Try::Tiny: 0
   URI: 0
   YAML::Any: 0
@@ -70,4 +71,4 @@ requires:
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.037
+version: 0.038
