@@ -6,7 +6,8 @@ LIMS2::Util::QcPrimers
 
 =head1 DESCRIPTION
 
-description
+Generate genotyping primers for various targets:
+    - Crispr Groups
 
 =cut
 
@@ -30,9 +31,9 @@ const our $CRISPR_GROUP_PRIMER3_CONFIG_FILE => $ENV{MGP_RECOVERY_PRIMER3_CONFIG}
     || '/nfs/users/nfs_s/sp12/workspace/LIMS2-Utils/primer3_mgp_recovery_crispr_group_primers.yaml';
 
 our %CRISPR_GROUP_PRIMER_NAMES = (
-    forward  => 'CGF',
-    internal => 'CGI',
-    reverse  => 'CGR',
+    forward  => 'DF1',
+    internal => 'ER1',
+    reverse  => 'DR1',
 );
 
 has model => (
@@ -77,7 +78,7 @@ has persist_primers => (
 
 =head2 crispr_group_genotyping_primers
 
-desc
+Generate a pair of primers plus a internal primer for a given crispr group.
 
 =cut
 sub crispr_group_genotyping_primers {
@@ -135,7 +136,11 @@ sub crispr_group_genotyping_primers {
 
 =head2 find_internal_primer
 
-desc
+Find a internal primer ( reverse ) that matches a already generated forward primer.
+The reverse primer must be found within a defined smaller search region.
+In addition the product size of the internal and forward primer as specific restrictions,
+it may not be within 30 bases in size of the product of the external primers after the 
+sequence has been deleted by the crispr group.
 
 =cut
 sub find_internal_primer {
@@ -204,7 +209,7 @@ sub find_internal_primer {
 
 =head2 persist_crispr_primer_data
 
-desc
+Persist the primers generated for a crispr group.
 
 =cut
 sub persist_crispr_primer_data {
