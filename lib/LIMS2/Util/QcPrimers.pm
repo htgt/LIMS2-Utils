@@ -27,17 +27,13 @@ with 'MooseX::Log::Log4perl';
 
 # TODO change this
 const our $MGP_RECOVERY_PRIMER3_CONFIG_FILE => $ENV{MGP_RECOVERY_PRIMER3_CONFIG}
-    || '/nfs/team87/farm3_lims2_vms/conf/primer3_design_create_config.yaml';
+    #|| '/nfs/team87/farm3_lims2_vms/conf/primer3_design_create_config.yaml';
+    || '/nfs/users/nfs_s/sp12/workspace/LIMS2-Utils/primer3_mgp_recovery_crispr_group_primers.yaml';
 
 has model => (
-    is         => 'ro',
-    isa        => 'LIMS2::Model',
-    lazy_build => 1,
+    is  => 'ro',
+    isa => 'LIMS2::Model',
 );
-
-sub _build_model {
-    return LIMS2::Model->new( user => 'tasks' );
-}
 
 has base_dir => (
     is       => 'ro',
@@ -58,41 +54,44 @@ sub _build_primer3_config_file {
     return file( $MGP_RECOVERY_PRIMER3_CONFIG_FILE )->absolute;
 }
 
+has commit => (
+    is      => 'ro',
+    isa     => 'Bool',
+    default => 0,
+);
+
 =head2 mgp_recovery_genotyping_primers
 
 desc
 
 =cut
 sub mgp_recovery_genotyping_primers {
-    my ( $self, $crispr_group_id ) = @_;
+    my ( $self, $crispr_group ) = @_;
+    $self->log->info( "GENERATE PRIMERS for $crispr_group, gene_id: " . $crispr_group->gene_id );
 
-    my $crispr_group = try{ $self->model->retrieve_crispr_group( { id => $crispr_group_id } ) };
-
-    LIMS2::Exception->throw( "Unable to find crispr group with id $crispr_group_id" )
-        unless $crispr_group;
-
-    my $work_dir = $self->base_dir->subdir( 'crispr_group_' . $crispr_group_id )->absolute;
+    my $work_dir = $self->base_dir->subdir( 'crispr_group_' . $crispr_group->id )->absolute;
     $work_dir->mkpath;
 
     $self->log->info( 'Searching for External Primers' );
     my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new(
-        base_dir                  => $work_dir,
-        species                   => $crispr_group->species,
-        strand                    => 1, # TODO check just 1 all the time?
-        chromosome                => $crispr_group->chr_name,
-        target_start              => $crispr_group->start,
-        target_end                => $crispr_group->end,
-        five_prime_region_size    => 300,
-        five_prime_region_offset  => 20,
-        three_prime_region_size   => 300,
-        three_prime_region_offset => 20,
-        primer3_config_file       => $self->primer3_config_file,
+        base_dir                    => $work_dir,
+        species                     => $crispr_group->species,
+        strand                      => 1, # always global +ve strand
+        chromosome                  => $crispr_group->chr_name,
+        target_start                => $crispr_group->start,
+        target_end                  => $crispr_group->end,
+        five_prime_region_size      => 300,
+        five_prime_region_offset    => 20,
+        three_prime_region_size     => 300,
+        three_prime_region_offset   => 20,
+        primer3_config_file         => $self->primer3_config_file,
+        primer_search_region_expand => 400,
     );
 
-    my $primer_data = $primer_finder->find_primers;
+    my ( $primer_data, $seq ) = $primer_finder->find_primers;
 
     unless ( $primer_data ) {
-        $self->log->error( 'Unable to generate primer pair for crispr group' );
+        $self->log->error( 'FAIL: Unable to generate primer pair for crispr group' );
         return;
     }
 
@@ -100,12 +99,16 @@ sub mgp_recovery_genotyping_primers {
     $self->log->info( 'Searching for Internal Primer' );
     my $picked_primers = $self->find_internal_primer( $crispr_group, $work_dir, $primer_data,
         $primer_finder->five_prime_region_size );
-    return unless $picked_primers;
 
-    $self->log->info( 'Found Internal Primer' );
-    #$self->persist_crispr_primer_data( $primer_data );
+    unless( $picked_primers ) {
+        $self->log->error( 'FAIL: Unable to find internal primer for crispr group' );
+        return;
+    }
 
-    return $picked_primers;
+    $self->log->info( 'SUCCESS: Found primers for target' );
+    #$self->persist_crispr_primer_data( $primer_data, $crispr_group );
+
+    return ( $picked_primers, $seq );
 }
 
 =head2 find_internal_primer
@@ -132,7 +135,6 @@ sub find_internal_primer {
     # number of bases to expand search region on each new attempt
     my $expand_size = int( ( $max_search_region_size - $initial_region_size ) / $retry_attempts );
 
-    my $sequence_excluded_region = $self->calculate_sequence_excluded_region();
     my %primer_params = (
         species                     => $crispr_group->species,
         strand                      => 1,
@@ -144,20 +146,22 @@ sub find_internal_primer {
         three_prime_region_size     => $initial_region_size,
         three_prime_region_offset   => 20,
         primer3_config_file         => $self->primer3_config_file,
-        primer_product_size_range   => '120-500', # ideal product size
         max_three_prime_region_size => $max_search_region_size,
         primer_search_region_expand => $expand_size,
         retry_attempts              => $retry_attempts,
+        internal_only               => 1,
     );
 
 
     my $count = 1;
     for my $primers ( @{ $primer_data } ) {
-        my $forward_primer_seq = $primers->{forward}{oligo_seq};
+        my $forward_primer = $primers->{forward};
         $self->log->info( '========' );
-        $self->log->info( "Search Internal Primer paired with forward primer: $forward_primer_seq" );
-        $primer_params{additional_primer3_params} = { sequence_primer => $forward_primer_seq };
-        $self->log->debug( "Chosen forward primer: $forward_primer_seq" );
+        $self->log->info( "Search Internal Primer paired with forward primer: " . $forward_primer->{oligo_seq} );
+
+        $primer_params{forward_primer} = $forward_primer;
+        my $avoid_size = $self->calculate_product_size_avoid( $primers, $crispr_group );
+        $primer_params{product_size_avoid} = $avoid_size;
 
         my $dir = $work_dir->subdir( 'internal_primer_' . $count++ )->absolute;
         $dir->mkpath;
@@ -166,9 +170,8 @@ sub find_internal_primer {
         my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new( %primer_params );
 
         # TODO addtional product size checking .....
-        # Size can not be within 30 bp of product size of deleted exon
 
-        my $internal_primer_data = $primer_finder->find_primers;
+        my ( $internal_primer_data ) = $primer_finder->find_primers;
         if ( $internal_primer_data ) {
             $primers->{internal} = $internal_primer_data->[0]{reverse};
             return $primers;
@@ -185,23 +188,57 @@ desc
 
 =cut
 sub persist_crispr_primer_data {
-    my ( $self, $primer_data ) = @_;
+    my ( $self, $primer_data, $crispr_group ) = @_;
 
-    # TODO UPPERCASE SEQUENCE
-    # multiple primers
-    $self->model->create_crispr_primer(  );
+    my %primer_names = (
+        forward  => 'CPF',
+        internal => 'CGI',
+        reverse  => 'CGR',
+    );
+    my $chr_name = $crispr_group->chr_name;
+    my $species = $crispr_group->right_most_crispr->species;
+    my $assembly_id = $species->default_assembly->assembly_id;
+
+    for my $type ( qw( forward reverse internal ) ) {
+        my $data = $primer_data->{$type};
+
+        $self->model->create_crispr_primer(
+            {
+                crispr_group_id => $crispr_group->id,
+                primer_name     => $primer_names{$type},
+                primer_seq      => uc( $data->{oligo_seq} ),
+                tm              => $data->{melting_temp},
+                gc_content      => $data->{gc_content},
+                locus => {
+                    assembly   => $assembly_id,
+                    chr_name   => $chr_name,
+                    chr_start  => $data->{oligo_end},
+                    chr_end    => $data->{oligo_start},
+                    chr_strand => $type eq 'forward' ? 1 : -1,
+                },
+            }
+        );
+    }
 
     return;
 }
 
-=head2 calculate_sequence_excluded_region
+=head2 calculate_product_size_avoid
 
-    # SEQUENCE_EXCLUDED_REGION
+Work out size of product we must avoid for internal primer ( matched to forward primer ).
+This is so its product size is not the same as the product size of the external primers
+minus the target region.
 
 =cut
-sub calculate_sequence_excluded_region {
-    my ( $self ) = @_;
+sub calculate_product_size_avoid {
+    my ( $self, $primers, $crispr_group ) = @_;
 
+    # TODO check this for -ve stranded target
+    my $primer_pair_product_size = $primers->{reverse}{oligo_end} - $primers->{forward}{oligo_start};
+    my $deleted_size = $crispr_group->end - $crispr_group->start;
+    my $avoid_size = $primer_pair_product_size - $deleted_size;
+
+    return  $avoid_size;
 }
 
 __PACKAGE__->meta->make_immutable;
