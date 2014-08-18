@@ -26,9 +26,14 @@ use namespace::autoclean;
 with 'MooseX::Log::Log4perl';
 
 # TODO change this
-const our $MGP_RECOVERY_PRIMER3_CONFIG_FILE => $ENV{MGP_RECOVERY_PRIMER3_CONFIG}
-    #|| '/nfs/team87/farm3_lims2_vms/conf/primer3_design_create_config.yaml';
+const our $CRISPR_GROUP_PRIMER3_CONFIG_FILE => $ENV{MGP_RECOVERY_PRIMER3_CONFIG}
     || '/nfs/users/nfs_s/sp12/workspace/LIMS2-Utils/primer3_mgp_recovery_crispr_group_primers.yaml';
+
+our %CRISPR_GROUP_PRIMER_NAMES = (
+    forward  => 'CGF',
+    internal => 'CGI',
+    reverse  => 'CGR',
+);
 
 has model => (
     is  => 'ro',
@@ -43,7 +48,7 @@ has base_dir => (
 );
 
 #TODO when we generate different types of primers within this
-#     module then this code needs to be changed
+#     module then the code to build the following 2 attributes must change
 has primer3_config_file => (
     is         => 'ro',
     isa        => AbsFile,
@@ -51,21 +56,31 @@ has primer3_config_file => (
 );
 
 sub _build_primer3_config_file {
-    return file( $MGP_RECOVERY_PRIMER3_CONFIG_FILE )->absolute;
+    return file( $CRISPR_GROUP_PRIMER3_CONFIG_FILE )->absolute;
 }
 
-has commit => (
+has primer_names => (
+    is         => 'ro',
+    isa        => 'HashRef',
+    lazy_build => 1,
+);
+
+sub _build_primer_names {
+    return \%CRISPR_GROUP_PRIMER_NAMES;
+}
+
+has persist_primers => (
     is      => 'ro',
     isa     => 'Bool',
     default => 0,
 );
 
-=head2 mgp_recovery_genotyping_primers
+=head2 crispr_group_genotyping_primers
 
 desc
 
 =cut
-sub mgp_recovery_genotyping_primers {
+sub crispr_group_genotyping_primers {
     my ( $self, $crispr_group ) = @_;
     $self->log->info( "GENERATE PRIMERS for $crispr_group, gene_id: " . $crispr_group->gene_id );
 
@@ -106,7 +121,14 @@ sub mgp_recovery_genotyping_primers {
     }
 
     $self->log->info( 'SUCCESS: Found primers for target' );
-    #$self->persist_crispr_primer_data( $primer_data, $crispr_group );
+
+    if ( $self->persist_primers ) {
+        $self->model->txn_do(
+            sub {
+                $self->persist_crispr_primer_data( $picked_primers, $crispr_group );
+            }
+        );
+    }
 
     return ( $picked_primers, $seq );
 }
@@ -169,8 +191,6 @@ sub find_internal_primer {
 
         my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new( %primer_params );
 
-        # TODO addtional product size checking .....
-
         my ( $internal_primer_data ) = $primer_finder->find_primers;
         if ( $internal_primer_data ) {
             $primers->{internal} = $internal_primer_data->[0]{reverse};
@@ -188,32 +208,29 @@ desc
 
 =cut
 sub persist_crispr_primer_data {
-    my ( $self, $primer_data, $crispr_group ) = @_;
+    my ( $self, $picked_primers, $crispr_group ) = @_;
+    $self->log->info( 'Persisting crispr group primers' );
 
-    my %primer_names = (
-        forward  => 'CPF',
-        internal => 'CGI',
-        reverse  => 'CGR',
-    );
     my $chr_name = $crispr_group->chr_name;
     my $species = $crispr_group->right_most_crispr->species;
     my $assembly_id = $species->default_assembly->assembly_id;
 
     for my $type ( qw( forward reverse internal ) ) {
-        my $data = $primer_data->{$type};
+        next unless exists $picked_primers->{$type};
+        my $data = $picked_primers->{$type};
 
         $self->model->create_crispr_primer(
             {
                 crispr_group_id => $crispr_group->id,
-                primer_name     => $primer_names{$type},
+                primer_name     => $self->primer_names->{$type},
                 primer_seq      => uc( $data->{oligo_seq} ),
                 tm              => $data->{melting_temp},
                 gc_content      => $data->{gc_content},
                 locus => {
                     assembly   => $assembly_id,
                     chr_name   => $chr_name,
-                    chr_start  => $data->{oligo_end},
-                    chr_end    => $data->{oligo_start},
+                    chr_start  => $data->{oligo_start},
+                    chr_end    => $data->{oligo_end},
                     chr_strand => $type eq 'forward' ? 1 : -1,
                 },
             }
