@@ -1,5 +1,14 @@
 {{$NEXT}}
 
+0.038     2014-08-01 12:27:04 Europe/London
+    
+    Added TraceServer    
+
+0.037     2014-08-01 11:57:02 Europe/London
+
+0.036     2014-07-08 15:55:32 Europe/London
+	TarmitsFeed floxed exons made optional in design info
+
 0.035     2014-07-01 14:29:49 Europe/London
 
     Bugfix: missing use statement
