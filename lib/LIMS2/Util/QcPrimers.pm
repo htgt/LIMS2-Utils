@@ -94,12 +94,6 @@ sub _build_primer3_config_file {
     return;
 }
 
-has internal_primer_product_size_restriction => (
-    is      => 'ro',
-    isa     => 'Bool',
-    default => 0,
-);
-
 has persist_primers => (
     is      => 'ro',
     isa     => 'Bool',
@@ -219,7 +213,7 @@ sub find_internal_primer {
         $self->log->info( "Search Internal Primer paired with forward primer: " . $forward_primer->{oligo_seq} );
 
         $primer_params{forward_primer} = $forward_primer;
-        if ( $self->internal_primer_product_size_restriction ) {
+        if ( $self->config->{internal_primer_product_size_restriction} ) {
             my $avoid_size = $self->calculate_product_size_avoid( $primers, $crispr_group );
             $primer_params{product_size_avoid} = $avoid_size;
         }
