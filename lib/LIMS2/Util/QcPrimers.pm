@@ -21,25 +21,46 @@ use MooseX::Types::Path::Class::MoreCoercions qw/AbsDir AbsFile/;
 use Try::Tiny;
 use Path::Class;
 use Const::Fast;
+use YAML::Any qw( LoadFile );
 
 use namespace::autoclean;
 
 with 'MooseX::Log::Log4perl';
 
-# TODO change this
-const our $CRISPR_GROUP_PRIMER3_CONFIG_FILE => $ENV{MGP_RECOVERY_PRIMER3_CONFIG}
-    || '/nfs/users/nfs_s/sp12/workspace/LIMS2-Utils/primer3_mgp_recovery_crispr_group_primers.yaml';
-
-our %CRISPR_GROUP_PRIMER_NAMES = (
-    forward  => 'DF1',
-    internal => 'ER1',
-    reverse  => 'DR1',
+my %PRIMER_PROJECT_CONFIG_FILES = (
+    mgp_recovery => $ENV{MGP_RECOVERY_GENOTYPING_PRIMER_CONFIG}
+            || '/nfs/users/nfs_s/sp12/workspace/LIMS2-Utils/mgp_recovery_genotyping.yaml',
+    short_arm_vectors => $ENV{SHORT_ARM_VECTOR_GENOTYPING_PRIMER_CONFIG}
+            || '/nfs/users/nfs_s/sp12/workspace/LIMS2-Utils/short_arm_vector_genotyping.yaml',
 );
 
 has model => (
     is  => 'ro',
     isa => 'LIMS2::Model',
 );
+
+has primer_project_name => (
+    is       => 'ro',
+    isa      => 'Str',
+    required => 1,
+    trigger  => \&_check_primer_project_name,
+);
+
+sub _check_primer_project_name {
+    my ( $self, $name ) = @_;
+    die ( "Unknown project name $name" ) unless exists $PRIMER_PROJECT_CONFIG_FILES{ $name };
+}
+
+has config => (
+    is         => 'ro',
+    isa        => 'HashRef',
+    lazy_build => 1,
+);
+
+sub _build_config {
+    my $self = shift;
+    return LoadFile( $PRIMER_PROJECT_CONFIG_FILES{ $self->primer_project_name } );
+}
 
 has base_dir => (
     is       => 'ro',
@@ -48,8 +69,6 @@ has base_dir => (
     coerce   => 1,
 );
 
-#TODO when we generate different types of primers within this
-#     module then the code to build the following 2 attributes must change
 has primer3_config_file => (
     is         => 'ro',
     isa        => AbsFile,
@@ -57,18 +76,24 @@ has primer3_config_file => (
 );
 
 sub _build_primer3_config_file {
-    return file( $CRISPR_GROUP_PRIMER3_CONFIG_FILE )->absolute;
+    my $self = shift;
+
+    if ( my $file_name = $self->config->{primer3_config} ) {
+        return file( $file_name )->absolute;
+    }
+    else {
+        die 'No primer3_config value in primer project config file '
+            . $PRIMER_PROJECT_CONFIG_FILES{ $self->primer_project_name };
+    }
+
+    return;
 }
 
-has primer_names => (
-    is         => 'ro',
-    isa        => 'HashRef',
-    lazy_build => 1,
+has internal_primer_product_size_restriction => (
+    is      => 'ro',
+    isa     => 'Bool',
+    default => 0,
 );
-
-sub _build_primer_names {
-    return \%CRISPR_GROUP_PRIMER_NAMES;
-}
 
 has persist_primers => (
     is      => 'ro',
@@ -83,6 +108,7 @@ Generate a pair of primers plus a internal primer for a given crispr group.
 =cut
 sub crispr_group_genotyping_primers {
     my ( $self, $crispr_group ) = @_;
+    $self->log->info( '====================' );
     $self->log->info( "GENERATE PRIMERS for $crispr_group, gene_id: " . $crispr_group->gene_id );
 
     my $work_dir = $self->base_dir->subdir( 'crispr_group_' . $crispr_group->id )->absolute;
@@ -96,12 +122,12 @@ sub crispr_group_genotyping_primers {
         chromosome                  => $crispr_group->chr_name,
         target_start                => $crispr_group->start,
         target_end                  => $crispr_group->end,
-        five_prime_region_size      => 300,
-        five_prime_region_offset    => 20,
-        three_prime_region_size     => 300,
-        three_prime_region_offset   => 20,
         primer3_config_file         => $self->primer3_config_file,
-        primer_search_region_expand => 400,
+        five_prime_region_size      => $self->config->{five_prime_region_size},
+        five_prime_region_offset    => $self->config->{five_prime_region_offset},
+        three_prime_region_size     => $self->config->{three_prime_region_size},
+        three_prime_region_offset   => $self->config->{three_prime_region_offset},
+        primer_search_region_expand => $self->config->{primer_search_region_expand},
     );
 
     my ( $primer_data, $seq ) = $primer_finder->find_primers;
@@ -139,7 +165,7 @@ sub crispr_group_genotyping_primers {
 Find a internal primer ( reverse ) that matches a already generated forward primer.
 The reverse primer must be found within a defined smaller search region.
 In addition the product size of the internal and forward primer as specific restrictions,
-it may not be within 30 bases in size of the product of the external primers after the 
+it may not be within 30 bases in size of the product of the external primers after the
 sequence has been deleted by the crispr group.
 
 =cut
@@ -183,12 +209,14 @@ sub find_internal_primer {
     my $count = 1;
     for my $primers ( @{ $primer_data } ) {
         my $forward_primer = $primers->{forward};
-        $self->log->info( '========' );
+        $self->log->info( '-------------' );
         $self->log->info( "Search Internal Primer paired with forward primer: " . $forward_primer->{oligo_seq} );
 
         $primer_params{forward_primer} = $forward_primer;
-        my $avoid_size = $self->calculate_product_size_avoid( $primers, $crispr_group );
-        $primer_params{product_size_avoid} = $avoid_size;
+        if ( $self->internal_primer_product_size_restriction ) {
+            my $avoid_size = $self->calculate_product_size_avoid( $primers, $crispr_group );
+            $primer_params{product_size_avoid} = $avoid_size;
+        }
 
         my $dir = $work_dir->subdir( 'internal_primer_' . $count++ )->absolute;
         $dir->mkpath;
@@ -227,7 +255,7 @@ sub persist_crispr_primer_data {
         $self->model->create_crispr_primer(
             {
                 crispr_group_id => $crispr_group->id,
-                primer_name     => $self->primer_names->{$type},
+                primer_name     => $self->primer_project_config->{primer_names}{$type},
                 primer_seq      => uc( $data->{oligo_seq} ),
                 tm              => $data->{melting_temp},
                 gc_content      => $data->{gc_content},
@@ -260,7 +288,7 @@ sub calculate_product_size_avoid {
     my $deleted_size = $crispr_group->end - $crispr_group->start;
     my $avoid_size = $primer_pair_product_size - $deleted_size;
 
-    return  $avoid_size;
+    return $avoid_size;
 }
 
 __PACKAGE__->meta->make_immutable;
