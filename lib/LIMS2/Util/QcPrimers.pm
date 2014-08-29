@@ -6,8 +6,12 @@ LIMS2::Util::QcPrimers
 
 =head1 DESCRIPTION
 
-Generate genotyping primers for various targets:
-    - Crispr Groups
+Currently generate genotyping primers for various targets:
+    - MGP Recovery Crispr Groups
+    - Short Arm Vector Crispr Groups
+
+More targets can be added by creating new config files and adding this
+to the PRIMER_PROJECT_CONFIG_FILES hash.
 
 =cut
 
@@ -51,6 +55,7 @@ sub _check_primer_project_name {
     die ( "Unknown project name $name" ) unless exists $PRIMER_PROJECT_CONFIG_FILES{ $name };
 }
 
+# parse the config yaml file and store in this hash
 has config => (
     is         => 'ro',
     isa        => 'HashRef',
@@ -164,8 +169,9 @@ sub crispr_group_genotyping_primers {
 
 Find a internal primer ( reverse ) that matches a already generated forward primer.
 The reverse primer must be found within a defined smaller search region.
-In addition the product size of the internal and forward primer as specific restrictions,
-it may not be within 30 bases in size of the product of the external primers after the
+
+Optionally the product size of the internal and forward primer may be restricted.
+It may not be within 30 bases in size of the product of the external primers after the
 sequence has been deleted by the crispr group.
 
 =cut
@@ -197,7 +203,7 @@ sub find_internal_primer {
         five_prime_region_size      => $five_prime_region_size,
         five_prime_region_offset    => 20, # does not really influence anything, so stays the same
         three_prime_region_size     => $initial_region_size,
-        three_prime_region_offset   => 20,
+        three_prime_region_offset   => $self->config->{internal_primer_region_offset},
         primer3_config_file         => $self->primer3_config_file,
         max_three_prime_region_size => $max_search_region_size,
         primer_search_region_expand => $expand_size,
@@ -283,8 +289,14 @@ minus the target region.
 sub calculate_product_size_avoid {
     my ( $self, $primers, $crispr_group ) = @_;
 
-    # TODO check this for -ve stranded target
-    my $primer_pair_product_size = $primers->{reverse}{oligo_end} - $primers->{forward}{oligo_start};
+    my $primer_pair_product_size;
+    # work out product size, strand dependant
+    if ( $primers->{forward}{oligo_start} < $primers->{reverse}{oligo_start} ) {
+        $primer_pair_product_size = $primers->{reverse}{oligo_end} - $primers->{forward}{oligo_start};
+    }
+    else {
+        $primer_pair_product_size = $primers->{forward}{oligo_end} - $primers->{reverse}{oligo_start};
+    }
     my $deleted_size = $crispr_group->end - $crispr_group->start;
     my $avoid_size = $primer_pair_product_size - $deleted_size;
 
