@@ -29,7 +29,8 @@ GetOptions(
 
 Log::Log4perl->easy_init( { level => $log_level, layout => '%p %x %m%n' } );
 
-die 'Must project a --project-name value' unless $project_name;
+pod2usage('Must specify a project --project-name') unless $project_name;
+pod2usage('Must specify a work dir --dir') unless $dir_name;
 
 my $base_dir = dir( $dir_name )->absolute;
 $base_dir->mkpath;
@@ -50,7 +51,7 @@ elsif ( $crispr_group_file ) {
     @crispr_group_ids = slurp $crispr_group_file, { chomp => 1 };
 }
 else {
-    die( 'Provide crispr group ids' );
+    pod2usage( 'Provide crispr group ids, --crispr-group-id or -crispr-group-file' );
 }
 
 for my $id ( @crispr_group_ids ) {
@@ -58,7 +59,6 @@ for my $id ( @crispr_group_ids ) {
     Log::Log4perl::NDC->push( $id );
 
     my $crispr_group = try{ $model->retrieve_crispr_group( { id => $id } ) };
-
     die( "Unable to find crispr group with id $id" )
         unless $crispr_group;
 
@@ -67,6 +67,11 @@ for my $id ( @crispr_group_ids ) {
     dump_output( $picked_primers, $seq, $crispr_group );
 }
 
+=head2 dump_output
+
+Write out the generated primers plus other useful information in YAML format.
+
+=cut
 sub dump_output {
     my ( $picked_primers, $seq, $crispr_group  ) = @_;
 
@@ -115,15 +120,24 @@ generate_crispr_group_genotyping_primers.pl - Generate genotyping primers for cr
       --persist-primers           Persist the generated primers to LIMS2
       --project-name              Name of project we are generating primers for
 
-Specify a project name, currently mgp_recovery and short_arm_vectors are valid.
+Specify a project name, currently following values are accepted: mgp_recovery, short_arm_vectors
+
 Crispr group IDs can either be specified individually or in a text file with one ID per line.
+
 Provide a directory name where the output files will be stored.
+
 By default the primers will not be persisted to LIMS2.
 
 =head1 DESCRIPTION
 
 Generate genotyping primers for crispr groups, which can be involved in the following projects:
-- mgp_recovery
-- short_arm_vectors
+
+=over
+
+=item mgp_recovery
+
+=item short_arm_vectors
+
+=back
 
 =cut
