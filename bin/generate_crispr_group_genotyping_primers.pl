@@ -97,6 +97,8 @@ sub dump_output {
     $picked_primers->{search_seq} = $seq->seq if $seq;
 
     print Dump( $picked_primers );
+
+    return;
 }
 
 

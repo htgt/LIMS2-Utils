@@ -53,6 +53,7 @@ has primer_project_name => (
 sub _check_primer_project_name {
     my ( $self, $name ) = @_;
     die ( "Unknown project name $name" ) unless exists $PRIMER_PROJECT_CONFIG_FILES{ $name };
+    return;
 }
 
 # parse the config yaml file and store in this hash
