@@ -9,6 +9,7 @@ bin/fixture_data_crisprs.pl
 bin/fixture_data_designs.pl
 bin/fixture_data_helper.pl
 bin/fixture_data_plate_wells.pl
+bin/generate_crispr_group_genotyping_primers.pl
 bin/post.sh
 bin/tarmits_feed_wrapper.pl
 bin/update_gene_solr_index.pl
@@ -22,6 +23,7 @@ lib/LIMS2/Util/FixtureDataLoad/Bacs.pm
 lib/LIMS2/Util/FixtureDataLoad/Crisprs.pm
 lib/LIMS2/Util/FixtureDataLoad/Designs.pm
 lib/LIMS2/Util/FixtureDataLoad/PlateAndWells.pm
+lib/LIMS2/Util/QcPrimers.pm
 lib/LIMS2/Util/Retry.pm
 lib/LIMS2/Util/Solr.pm
 lib/LIMS2/Util/Tarmits.pm

@@ -29,7 +29,8 @@ my %WriteMakefileArgs = (
     "bin/fixture_data_helper.pl",
     "bin/fixture_data_plate_wells.pl",
     "bin/post.sh",
-    "bin/update_gene_solr_index.pl"
+    "bin/update_gene_solr_index.pl",
+    "bin/generate_crispr_group_genotyping_primers.pl"
   ],
   "LICENSE" => "perl",
   "NAME" => "LIMS2::Util",
@@ -44,6 +45,7 @@ my %WriteMakefileArgs = (
     "EngSeqBuilder" => 0,
     "File::Temp" => 0,
     "Getopt::Long" => 0,
+    "HTGT::QC::Util::GeneratePrimersAttempts" => 0,
     "HTML::Entities" => 0,
     "HTTP::Request" => 0,
     "Hash::MoreUtils" => 0,
@@ -72,8 +74,10 @@ my %WriteMakefileArgs = (
     "MooseX::Log::Log4perl" => 0,
     "MooseX::SimpleConfig" => 0,
     "MooseX::Types::Path::Class" => 0,
+    "MooseX::Types::Path::Class::MoreCoercions" => 0,
     "MooseX::Types::URI" => 0,
     "Path::Class" => 0,
+    "Perl6::Slurp" => 0,
     "Pod::Usage" => 0,
     "Readonly" => 0,
     "Scalar::Util" => 0,
@@ -89,7 +93,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.038",
+  "VERSION" => "0.039",
   "test" => {
     "TESTS" => "t/*.t"
   }

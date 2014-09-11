@@ -1,3 +1,8 @@
+0.039     2014-09-11 14:48:55 Europe/London
+
+    Added new code to generate genotyping primers for mgp_recovery and
+    short_arm_vector projects.
+
 0.038     2014-08-01 12:27:04 Europe/London
     
     Added TraceServer    

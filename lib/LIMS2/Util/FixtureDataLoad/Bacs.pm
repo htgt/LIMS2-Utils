@@ -1,7 +1,7 @@
 package LIMS2::Util::FixtureDataLoad::Bacs;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::FixtureDataLoad::Bacs::VERSION = '0.038';
+    $LIMS2::Util::FixtureDataLoad::Bacs::VERSION = '0.039';
 }
 ## use critic
 

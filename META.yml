@@ -27,6 +27,7 @@ requires:
   EngSeqBuilder: 0
   File::Temp: 0
   Getopt::Long: 0
+  HTGT::QC::Util::GeneratePrimersAttempts: 0
   HTML::Entities: 0
   HTTP::Request: 0
   Hash::MoreUtils: 0
@@ -55,8 +56,10 @@ requires:
   MooseX::Log::Log4perl: 0
   MooseX::SimpleConfig: 0
   MooseX::Types::Path::Class: 0
+  MooseX::Types::Path::Class::MoreCoercions: 0
   MooseX::Types::URI: 0
   Path::Class: 0
+  Perl6::Slurp: 0
   Pod::Usage: 0
   Readonly: 0
   Scalar::Util: 0
@@ -71,4 +74,4 @@ requires:
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.038
+version: 0.039
