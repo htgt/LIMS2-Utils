@@ -33,9 +33,9 @@ with 'MooseX::Log::Log4perl';
 
 my %PRIMER_PROJECT_CONFIG_FILES = (
     mgp_recovery => $ENV{MGP_RECOVERY_GENOTYPING_PRIMER_CONFIG}
-            || '/nfs/users/nfs_s/sp12/workspace/LIMS2-Utils/mgp_recovery_genotyping.yaml',
+            || '/opt/t87/global/conf/primers/mgp_recovery_genotyping.yaml',
     short_arm_vectors => $ENV{SHORT_ARM_VECTOR_GENOTYPING_PRIMER_CONFIG}
-            || '/nfs/users/nfs_s/sp12/workspace/LIMS2-Utils/short_arm_vector_genotyping.yaml',
+            || '/opt/t87/global/conf/primers/short_arm_vector_genotyping.yaml',
 );
 
 has model => (
