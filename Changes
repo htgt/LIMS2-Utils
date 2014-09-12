@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.040     2014-09-12 08:32:49 Europe/London
+
+    Fix bug which prevented persisting of primers to LIMS2
+
 0.039     2014-09-11 14:48:55 Europe/London
 
     Added new code to generate genotyping primers for mgp_recovery and
