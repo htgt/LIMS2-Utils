@@ -1,7 +1,7 @@
 package LIMS2::Util::QcPrimers;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::QcPrimers::VERSION = '0.039';
+    $LIMS2::Util::QcPrimers::VERSION = '0.040';
 }
 ## use critic
 
@@ -262,7 +262,7 @@ sub persist_crispr_primer_data {
         $self->model->create_crispr_primer(
             {
                 crispr_group_id => $crispr_group->id,
-                primer_name     => $self->primer_project_config->{primer_names}{$type},
+                primer_name     => $self->config->{primer_names}{$type},
                 primer_seq      => uc( $data->{oligo_seq} ),
                 tm              => $data->{melting_temp},
                 gc_content      => $data->{gc_content},
