@@ -54,6 +54,7 @@ else {
     pod2usage( 'Provide crispr group ids, --crispr-group-id or -crispr-group-file' );
 }
 
+my @failed;
 for my $id ( @crispr_group_ids ) {
     Log::Log4perl::NDC->remove;
     Log::Log4perl::NDC->push( $id );
@@ -65,7 +66,11 @@ for my $id ( @crispr_group_ids ) {
     my ( $picked_primers, $seq ) = $primer_util->crispr_group_genotyping_primers( $crispr_group );
 
     dump_output( $picked_primers, $seq, $crispr_group );
+
+    push @failed, $id unless $picked_primers;
 }
+
+print Dump( { failed => \@failed } );
 
 =head2 dump_output
 
