@@ -36,7 +36,20 @@ has species_data => (
 sub _build_species_data {
     my $self = shift;
 
-    return $self->rest_client->GET( 'get_all_species' );
+    my $data = $self->rest_client->GET( 'get_all_species' );
+    my %species_data;
+    for my $id ( keys %{ $data } ) {
+        if ( $data->{$id} =~ /^(\w+) \((.+)\)$/ ) {
+            $species_data{$id}{species} = $1;
+            $species_data{$id}{assembly} = $2;
+        }
+        else {
+            LIMS2::Exception->throw(
+                'Can not parse species and assembly from wge species display name: '
+                    . $data->{$id} );
+        }
+    }
+    return \%species_data;
 }
 
 sub _build_rest_client {
@@ -48,15 +61,24 @@ sub _build_rest_client {
 }
 
 sub get_crispr {
-    my ( $self, $id, $assembly ) = @_;
+    my ( $self, $id, $assembly, $species ) = @_;
 
     LIMS2::Exception::Validation->throw( "Assembly must be provided" )
         unless $assembly;
 
     my $wge_crispr = $self->_get_crispr( $id );
+    my $species_id = $wge_crispr->{species_id};
+    my $crispr_species = $self->species_data->{$species_id}{species};
+    my $crispr_assembly = $self->species_data->{$species_id}{assembly};
+
+    LIMS2::Exception::Validation->throw( "Crispr species: $crispr_species is not the same as current species: $species" )
+        unless $species eq $crispr_species;
+
+    LIMS2::Exception::Validation->throw( "Crispr is on $crispr_assembly assembly, current LIMS2 assembly for $species: $assembly" )
+        unless $assembly eq $crispr_assembly;
 
     my $crispr = {
-        species => $self->species_data->{$wge_crispr->{species_id}},
+        species => $crispr_species,
         off_target_algorithm => 'bwa',
         type                 => 'Exonic',
         wge_crispr_id        => $wge_crispr->{id},
@@ -65,10 +87,10 @@ sub get_crispr {
             chr_start  => $wge_crispr->{chr_start},
             chr_end    => $wge_crispr->{chr_end},
             chr_strand => $wge_crispr->{pam_right} ? 1 : -1,
-            assembly   => $assembly,
+            assembly   => $crispr_assembly,
         },
         pam_right => $wge_crispr->{pam_right},
-        seq      => $wge_crispr->{seq},
+        seq       => $wge_crispr->{seq},
         off_target_summary => $wge_crispr->{off_target_summary},
     };
 
