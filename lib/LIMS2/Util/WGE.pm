@@ -115,18 +115,19 @@ sub _get_crispr {
 }
 
 sub get_crispr_pair {
-    my ( $self, $left_id, $right_id, $species ) = @_;
+    my ( $self, $left_id, $right_id, $species, $assembly ) = @_;
 
+    my $wge_species_id = $self->_calculate_wge_species_id( $species, $assembly );
     my $crispr_pair_data;
     try {
         $crispr_pair_data = $self->rest_client->GET( 'find_or_create_crispr_pair', {
-            left_id  => $left_id,
-            right_id => $right_id,
-            species  => $species,
+            left_id     => $left_id,
+            right_id    => $right_id,
+            species_id  => $wge_species_id,
         } );
 
         #get lims2 species
-        $crispr_pair_data->{species} = $self->species_data->{$crispr_pair_data->{species_id}}
+        $crispr_pair_data->{species} = $self->species_data->{$crispr_pair_data->{species_id}}{species};
     }
     catch {
         $self->log->debug( "Error retrieving CRISPR pair: \n" . $_ );
@@ -134,6 +135,21 @@ sub get_crispr_pair {
     };
 
     return $crispr_pair_data;
+}
+
+sub _calculate_wge_species_id {
+    my ( $self, $species, $assembly ) = @_;
+
+    for my $key ( keys %{ $self->species_data } ) {
+        if ( $self->species_data->{$key}{species} eq $species && $self->species_data->{$key}{assembly} eq $assembly ) {
+            return $key;
+        }
+    }
+
+    LIMS2::Exception->throw(
+        "Unable to calculate wge_species_id for species: $species and assembly: $assembly");
+
+    return;
 }
 
 __PACKAGE__->meta->make_immutable;
