@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.041     2014-10-07 09:08:21 Europe/London
+
+    New human assembly, species and assembly now specified when importing from WGE to LIMS2
+
 0.040     2014-09-12 08:32:49 Europe/London
 
     Fix bug which prevented persisting of primers to LIMS2
