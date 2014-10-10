@@ -818,7 +818,8 @@ sub _update_targ_vect_ikmc_project_id {
 
     my $update_ok = 0;
 
-    my $ikmc_project_id = $self->_select_or_create_ikmc_project_id;
+    # use no dre allele for targeting vector ikmc project id
+    my $ikmc_project_id = $self->_create_ikmc_project_id( $self->curr_allele_no_dre_id );
 
     try {
         my $update_ikmc_proj_id_params = {
@@ -892,7 +893,7 @@ sub _insert_targeting_vector {
     my $insert_tv_params = {
         'name'                  => $self->curr_targeting_vector_name,
         'allele_id'             => $self->curr_allele_no_dre_id,
-        'ikmc_project_id'       => $self->_select_or_create_ikmc_project_id(),
+        'ikmc_project_id'       => $self->_create_ikmc_project_id( $self->curr_allele_no_dre_id ),
         'intermediate_vector'   => $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'intermediate_vector' },
         'pipeline_id'           => $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'pipeline_id' },
         'report_to_public'      => $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'report_to_public' },
@@ -923,21 +924,17 @@ sub _insert_targeting_vector {
     return $self->curr_targeting_vector_id;
 }
 
-sub _select_or_create_ikmc_project_id {
-    my ( $self ) = @_;
+sub _create_ikmc_project_id {
+    my ( $self, $allele_id ) = @_;
 
-    my $ikmc_proj_id;
-
-    # a legacy project id may already exist
-    $ikmc_proj_id = $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'ikmc_project_id' };
-
-    # if no legacy project id found, create a new one,
-    # N.B. always use the no dre allele ID for the ikmc project id
-    unless ( defined $ikmc_proj_id && $ikmc_proj_id ne '' ) {
-        $ikmc_proj_id = ( $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'pipeline_name' } ).'_'.$self->curr_allele_no_dre_id;
+    # default to no dre allele id
+    unless ( $allele_id ) {
+        $allele_id = $self->curr_allele_no_dre_id;
     }
 
-    DEBUG "Select or create, ikmc_proj_id set to: ".$ikmc_proj_id;
+    my $ikmc_proj_id = ( $self->curr_targeting_vector->{ 'targeting_vector_details' }->{ 'pipeline_name' } ).'_'.$allele_id;
+
+    DEBUG "create_ikmc_proj_id set to: ".$ikmc_proj_id;
 
     return $ikmc_proj_id;
 }
@@ -1071,7 +1068,9 @@ sub _update_clone_ikmc_project_id {
 
     my $update_ok = 0;
 
-    my $ikmc_project_id = $self->_select_or_create_ikmc_project_id;
+    my $allele_id = $self->_select_current_clone_allele_id();
+
+    my $ikmc_project_id = $self->_create_ikmc_project_id( $allele_id );
 
     try {
         my $update_ikmc_proj_id_params = {
@@ -1205,10 +1204,8 @@ sub _update_clone_allele_id {
     return $update_ok;
 }
 
-sub _insert_clone {
+sub _select_current_clone_allele_id {
     my ( $self ) = @_;
-
-    DEBUG "Inserting new es clone";
 
     # allele id depends on whether dre or no-dre
     my $allele_id;
@@ -1221,12 +1218,23 @@ sub _insert_clone {
         $allele_id = $self->curr_allele_no_dre_id;
     }
 
+    return $allele_id
+}
+
+sub _insert_clone {
+    my ( $self ) = @_;
+
+    DEBUG "Inserting new es clone";
+
+    # allele id depends on whether dre or no-dre
+    my $allele_id = $self->_select_current_clone_allele_id();
+
     DEBUG "Allele ID to insert: ".$allele_id;
 
     my $insert_es_cell_params = {
         'name'                          => $self->curr_clone_name,
         'allele_id'                     => $allele_id,
-        'ikmc_project_id'               => $self->_select_or_create_ikmc_project_id (),
+        'ikmc_project_id'               => $self->_create_ikmc_project_id( $allele_id ),
         'targeting_vector_id'           => $self->curr_targeting_vector_id,
         'parental_cell_line'            => $self->curr_clone->{ 'es_cell_details' }->{ 'parental_cell_line' },
         'pipeline_id'                   => $self->curr_clone->{ 'es_cell_details' }->{ 'pipeline_id' },
@@ -1873,11 +1881,41 @@ sub _refactor_selected_clones {
             my $new_clone = $self->_select_lims2_es_clone_details ( $result, $es_clone_id, $targeting_vector_id );
             $curr_targ_vector_hash->{ 'clones' }->{ $es_clone_id } = $new_clone;
 
+            $self->_set_allele_symbol_superscript( $curr_targ_vector_hash, $es_clone_id );
+
             $self->_increment_vector_counters( $result->{ 'ep_recombinase' }, $es_clone_id, $curr_targ_vector_hash );
         }
     }
 
     return \%results_refactored;
+}
+
+sub _set_allele_symbol_superscript {
+    my ( $self, $curr_targ_vector_hash, $es_clone_id ) = @_;
+
+    my $clone_details = $curr_targ_vector_hash->{ 'clones' }->{ $es_clone_id }->{ 'es_cell_details' };
+
+    my $prefix = 'tm1';
+    # adjust prefix depending on cassette type
+    if ( $curr_targ_vector_hash->{ 'cassette' } =~ m/neo/i ) {
+        $prefix = 'tm2';
+    }
+
+    my $allele_ss = "";
+
+    # Check if Neo or Puro cassette to set tm1 or tm2
+    if ( $clone_details->{ 'ep_recombinase' } eq 'Dre' ) {
+        $allele_ss = $prefix . '.1(EGFP_CreERT2)Wtsi'; # for Dre
+    }
+    else {
+        $allele_ss = $prefix . '(EGFP_CreERT2)Wtsi'; # for non Dre
+    }
+
+    # DEBUG "Setting mgi_allele_symbol_superscript to $allele_ss";
+
+    $clone_details->{ 'mgi_allele_symbol_superscript' } = $allele_ss;
+
+    return;
 }
 
 # count accepted clones for targeting vector for use when deciding whether to insert alleles
@@ -1938,10 +1976,14 @@ sub _select_lims2_design_details {
 
     #   Floxed Exon                                     -> from designs.target_transcript
     try {
-        $new_mutation_details{ 'floxed_start_exon' } = $design_info->first_floxed_exon->stable_id;
-        $new_mutation_details{ 'floxed_end_exon' }   = $design_info->last_floxed_exon->stable_id;
+        if ( defined $design_info->first_floxed_exon ) {
+            $new_mutation_details{ 'floxed_start_exon' } = $design_info->first_floxed_exon->stable_id;
+        }
+        if ( defined $design_info->last_floxed_exon ) {
+            $new_mutation_details{ 'floxed_end_exon' }   = $design_info->last_floxed_exon->stable_id;
+        }
     } catch {
-        WARN "FAILED to fetch floxed exons for gene: ".$self->curr_gene_mgi_id." design id: ". $self->curr_design_id;
+        WARN "FAILED to fetch floxed exons for gene: ".$design_details{ 'info' }->{ 'design_gene_symbol' }." design id: ". $design_details{ 'project_design_id' };
         WARN "Exception: ".$_;
     };
 
@@ -2125,14 +2167,6 @@ sub _get_es_clone_cell_details {
 
     # electroporation Recombinase ID
     $es_cell_details{ 'ep_recombinase' }                = $result->{ 'ep_recombinase' };
-
-    #   Allele symbol superscript - hardcoded
-    if ( $result->{ 'ep_recombinase' } eq 'Dre' ) {
-        $es_cell_details{ 'mgi_allele_symbol_superscript' } = 'tm1.1(EGFP_CreERT2)Wtsi'; # for Dre
-    }
-    else {
-        $es_cell_details{ 'mgi_allele_symbol_superscript' } = 'tm1(EGFP_CreERT2)Wtsi'; # for non Dre
-    }
 
     $new_clone->{ 'es_cell_details' }                   = { %es_cell_details };
 
