@@ -6,6 +6,9 @@ LIMS2::Util::ESQCUpdateWellAccepted
 
 =head1 DESCRIPTION
 
+Takes a qc_run done against a EP_PICK plate. For each well gathers the valid primers from
+the qc run plus any primer band information stored against the well itself. With this list
+of primers we can work out if the EP PICK well should be marked as accepted or not.
 
 =cut
 
@@ -44,6 +47,7 @@ sub _build_qc_run_results {
     return retrieve_qc_run_results_fast( $self->qc_run, $self->model->schema );
 }
 
+# Used to calculate if a wel has mixed reads or not
 has qc_run_results_by_well => (
     is         => 'ro',
     isa        => 'HashRef',
@@ -90,6 +94,11 @@ has accepted_wells => (
     }
 );
 
+=head2 update_well_accepted
+
+Run the code that will update the well accepted values
+
+=cut
 sub update_well_accepted {
     my $self = shift;
 
@@ -105,7 +114,7 @@ sub update_well_accepted {
         sub {
             try{
                 for my $qc_data ( @{ $self->qc_run_results } ) {
-                    $self->well_check( $qc_data );
+                    $self->update_well( $qc_data );
                 }
 
                 unless ( $self->commit ) {
@@ -134,7 +143,12 @@ sub update_well_accepted {
     return;
 }
 
-sub well_check {
+=head2 update_well
+
+Check a individual ep pick well to see if it should be marked as accepted.
+
+=cut
+sub update_well {
     my ( $self, $well_qc_data ) = @_;
     my $plate_name = $well_qc_data->{plate_name};
     my $well_name = uc( $well_qc_data->{well_name} );
@@ -182,6 +196,13 @@ sub well_check {
     return;
 }
 
+=head2 add_well_qc_sequencing_result_for_well
+
+Add a well_qc_sequencing_result record linked a ep_pick well.
+This will contain a list of valid primers, a link to the relevant qc_run
+result page and a pass or fail value.
+
+=cut
 sub add_well_qc_sequencing_result_for_well {
     my ( $self, $epd_well, $valid_primers, $pass, $well_name, $plate_name ) = @_;
 
@@ -216,7 +237,12 @@ sub add_well_qc_sequencing_result_for_well {
     return;
 }
 
-# five_arm_pass = GF AND (Art5 OR R1R)
+=head2 five_arm_pass
+
+Logic to work out if we can call a five arm pass on the well
+GF AND (Art5 OR R1R)
+
+=cut
 sub five_arm_pass {
     my ( $self, $primers ) = @_;
 
@@ -229,7 +255,12 @@ sub five_arm_pass {
     return;
 }
 
-# three_arm_pass = 'GR AND (A_R2R OR A_LR OR Z_LRR OR A_LF OR A_LRR OR A_LFR OR Z_LR)'
+=head2 three_arm_pass
+
+Logic to work out if we can call a three arm pass on the well
+GR AND (A_R2R OR A_LR OR Z_LRR OR A_LF OR A_LRR OR A_LFR OR Z_LR)
+
+=cut
 sub three_arm_pass {
     my ( $self, $primers ) = @_;
 
@@ -245,9 +276,14 @@ sub three_arm_pass {
     return;
 }
 
-# loxp_pass = GR AND (LR OR LF OR LRR)
-# OR
-# (TR AND (B_R2R OR B_LFR)) AND (GF AND (Art5 OR R1R))
+=head2 loxp_pass
+
+Logic to work out if we can call a loxp pass on the well
+GR AND (LR OR LF OR LRR)
+OR
+(TR AND (B_R2R OR B_LFR)) AND (GF AND (Art5 OR R1R))
+
+=cut
 sub loxp_pass {
     my ( $self, $primers ) = @_;
 
