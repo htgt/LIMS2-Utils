@@ -11,11 +11,12 @@ LIMS2::Util::ESQCUpdateWellAccepted
 
 use Moose;
 
-use LIMS2::Model;
 use LIMS2::Exception;
-use LIMS2::Model::Util::QCResults qw( retrieve_qc_run_results_fast retrieve_qc_run_seq_well_results );
+use LIMS2::Model::Util::QCResults qw( retrieve_qc_run_results_fast );
 use Try::Tiny;
+use List::MoreUtils qw( any );
 use URI;
+use Log::Log4perl;
 
 use namespace::autoclean;
 
@@ -45,7 +46,7 @@ sub _build_qc_run_results {
 
 has qc_run_results_by_well => (
     is         => 'ro',
-    isa        => 'ArrayRef',
+    isa        => 'HashRef',
     lazy_build => 1,
 );
 
@@ -62,7 +63,7 @@ sub _build_qc_run_results_by_well {
 
 has user => (
     is       => 'ro',
-    isa      => 'LIMS2::Model::Schema::Result::User',
+    isa      => 'Str',
     required => 1,
 );
 
@@ -72,35 +73,62 @@ has base_qc_url => (
     required => 1,
 );
 
-# INITIAL CHECKs
-# qc run linked to epd plate
-# it is es qc ( profile limit ? )
+has commit => (
+    is      => 'ro',
+    isa     => 'Bool',
+    default => 0,
+);
 
-# DATA
-# lrpcr data for each ep_pick well ( well_primer_bands, type_id lr_pcr_pass )
-# qc primer data
+has accepted_wells => (
+    is      => 'ro',
+    isa     => 'ArrayRef',
+    default => sub{ [] },
+    traits  => [ 'Array' ],
+    handles => {
+        add_accepted_well => 'push',
+        has_accepted_wells => 'count',
+    }
+);
 
-# LOGIC
-# loxp_pass = '(GR AND (LR OR LF OR LRR)) OR ((TR AND (B_R2R OR B_LFR)) AND (GF AND (Art5 OR R1R)))'
-# five_arm_pass = '(GF AND (Art5 OR R1R))'
-# three_arm_pass = 'GR AND (A_R2R OR A_LR OR Z_LRR OR A_LF OR A_LRR OR A_LFR OR Z_LR)'
-# overall pass = five_arm_pass or three_arm_pass AND loxp_pass
-
-# ACCEPTED
-# mark well as accepted
-# add a link to the qc test result via the well_qc_sequencing_result table
-use Smart::Comments;
-sub test {
+sub update_well_accepted {
     my $self = shift;
 
+    $self->log->info( 'Analysing results from qc_run: ' . $self->qc_run->id );
 
-    # TODO: CHECK
+    unless ( $self->qc_run->profile eq 'standard-es-cell' ) {
+        $self->log->warn('Qc Run does not use standard-es-cell profile : ' . $self->qc_run->profile );
+        return ( [], 'Can only set epd wells accepted flag from standard-es-cell qc profile' );
+    }
 
-    for my $datum ( @{ $data } ) {
-        # TODO rollback / commits
-        if ( @{ $datum->{valid_primers} } ) {
-            $self->well_check( $datum );
+    my $error;
+    $self->model->txn_do(
+        sub {
+            try{
+                for my $qc_data ( @{ $self->qc_run_results } ) {
+                    $self->well_check( $qc_data );
+                }
+
+                unless ( $self->commit ) {
+                    $self->log->warn( 'Run in non-commit mode, rolling back changes' );
+                    $self->model->txn_rollback;
+                }
+            }
+            catch {
+                $self->log->error( "Error: $_" );
+                $error = $_;
+                $self->model->txn_rollback;
+            };
         }
+    );
+
+    if ( $error ) {
+        return ( [], $error );
+    }
+    elsif ( $self->has_accepted_wells ) {
+        return ( $self->accepted_wells, undef );
+    }
+    else {
+        return ( [], 'No wells passed qc checks' );
     }
 
     return;
@@ -108,79 +136,143 @@ sub test {
 
 sub well_check {
     my ( $self, $well_qc_data ) = @_;
-
     my $plate_name = $well_qc_data->{plate_name};
-    my $well_name = lc( $well_qc_data->{well_name} );
+    my $well_name = uc( $well_qc_data->{well_name} );
+    Log::Log4perl::NDC->remove;
+    Log::Log4perl::NDC->push( $plate_name . '_' . $well_name );
+
     my $epd_well = try {
-            $self->model->retrieve_well(
-            {
-                plate_name => $plate_name,
-                well_name  => uc( $well_name ),
+        $self->model->retrieve_well(
+            {   plate_name => $plate_name,
+                well_name  => $well_name,
             }
         );
     };
 
-    unless ( $epd_well ) {
-        LIMS2::Exceptions->throw( "Can not locate well: $plate_name $well_name");
-    }
+    LIMS2::Exceptions->throw( "Can not locate well: $plate_name $well_name") unless $epd_well;
+
+    # grap LR PCR primers from well and merge with valid primers list from qc
     my @valid_primers = @{ $well_qc_data->{valid_primers} };
     my @valid_lrpcr_primers = map { uc( $_->primer_band_type->id ) }
         grep { $_->pass =~ /pass/ } $epd_well->well_primer_bands;
     push @valid_primers, @valid_lrpcr_primers;
 
-    # does well 'pass'
+    # overall pass = ( five_arm_pass OR three_arm_pass ) AND loxp_pass
     if ( ( $self->five_arm_pass( \@valid_primers ) || $self->three_arm_pass( \@valid_primers ) )
         && $self->loxp_pass( \@valid_primers ) )
     {
-        # mark epd well as accepted
+        $self->log->info( 'Well is being marked accepted' );
+        $self->add_accepted_well( $plate_name . '_' . $well_name );
         $epd_well->update( { accepted => 1 } );
 
-        # TODO what to do about already existing well_qc_sequencing_results??
-        # -- must delete it ,can only have one result according to schema
-        my $result = $epd_well->well_qc_sequencing_result;
-        $result->delete if $result;
-
-        my $view_params = {
-            well_name  => $well_name,
-            plate_name => $plate_name,
-            qc_run_id  => $self->qc_run->id,
-        };
-
-        my $url = URI->new($self->base_qc_url);
-        $url->query_form($view_params);
-        $self->model->create_well_qc_sequencing_result(
-            {
-                well_id         => $epd_well->id,
-                valid_primers   => join( ',', @valid_primers ),
-                mixed_reads     => @{ $self->results_by_well->{ $well_name } } > 1 ? 1 : 0,
-                pass            => 1,
-                test_result_url => $url->as_string,
-                created_by      => $user->name,
-            }, $epd_well,
-        );
+        $self->log->info( '. creating well_qc_sequencing_result record for well ( pass )' );
+        $self->add_well_qc_sequencing_result_for_well( $epd_well, \@valid_primers, 1, $well_name, $plate_name );
     }
     else {
-        # log something
+        $self->log->info( 'Well does not meet accepted criteria' );
+        if ( $epd_well->accepted ) {
+            $self->log->info( '. but it has already been marked as accepted, do nothing' );
+            return;
+        }
+        $self->log->info( '. creating well_qc_sequencing_result record for well ( failed )' );
+
+        $self->add_well_qc_sequencing_result_for_well( $epd_well, \@valid_primers, 0, $well_name, $plate_name );
     }
 
-    ### well : $epd_well->as_string
-    ### valid primers : @valid_primers
     return;
 }
 
+sub add_well_qc_sequencing_result_for_well {
+    my ( $self, $epd_well, $valid_primers, $pass, $well_name, $plate_name ) = @_;
+
+    # If there is already a well_qc_sequencing_result row linked to this well
+    # then we need to delete it and create a new one with the current qc data
+    if ( my $result = $epd_well->well_qc_sequencing_result ) {
+        $self->log->info( '.. deleting pre-existing well_qc_sequencing_result row first' );
+        $result->delete;
+    }
+
+    my $view_params = {
+        well_name  => lc( $well_name ),
+        plate_name => $plate_name,
+        qc_run_id  => $self->qc_run->id,
+    };
+
+    my $url = URI->new($self->base_qc_url);
+    $url->query_form($view_params);
+    $self->log->debug( '.. creating well_qc_sequencing_result' );
+
+    $self->model->create_well_qc_sequencing_result(
+        {
+            well_id         => $epd_well->id,
+            valid_primers   => join( ',', @{ $valid_primers } ),
+            mixed_reads     => @{ $self->qc_run_results_by_well->{ $well_name } } > 1 ? 1 : 0,
+            pass            => $pass,
+            test_result_url => $url->as_string,
+            created_by      => $self->user,
+        }, $epd_well,
+    );
+
+    return;
+}
+
+# five_arm_pass = GF AND (Art5 OR R1R)
 sub five_arm_pass {
-    my ( $self, $valid_primers ) = @_;
+    my ( $self, $primers ) = @_;
 
+    if ( has_primer( $primers, qr/GF/ )
+        && ( has_primer( $primers, qr/R1R/ ) || has_primer( $primers, qr/Art5/ ) ) )
+    {
+        return 1;
+    }
+
+    return;
 }
 
+# three_arm_pass = 'GR AND (A_R2R OR A_LR OR Z_LRR OR A_LF OR A_LRR OR A_LFR OR Z_LR)'
 sub three_arm_pass {
-    my ( $self, $valid_primers ) = @_;
+    my ( $self, $primers ) = @_;
 
+    if (has_primer( $primers, qr/^GR/i )
+        && (   has_primer( $primers, qr/R2R/i )
+            || has_primer( $primers, qr/LRR?/ )
+            || has_primer( $primers, qr/LFR/ ) )
+        )
+    {
+        return 1;
+    }
+
+    return;
 }
 
+# loxp_pass = GR AND (LR OR LF OR LRR)
+# OR
+# (TR AND (B_R2R OR B_LFR)) AND (GF AND (Art5 OR R1R))
 sub loxp_pass {
-    my ( $self, $valid_primers ) = @_;
+    my ( $self, $primers ) = @_;
 
+    if ( has_primer( $primers, qr/^GR/i )
+        && ( has_primer( $primers, qr/LF/i ) || has_primer( $primers, qr/LRR?/i ) ) )
+    {
+        return 1;
+    }
+    elsif (
+        (   has_primer( $primers, qr/TR/i )
+            && ( has_primer( $primers, qr/R2R/ ) || has_primer( $primers, qr/LFR/i ) )
+        )
+        && ( has_primer( $primers, qr/GF/i )
+            && ( has_primer( $primers, qr/Art5/i ) || has_primer( $primers, qr/R1R/i ) ) )
+        )
+    {
+        return 1;
+    }
+
+    return;
+}
+
+sub has_primer {
+    my ( $primer_list, $regex ) = @_;
+    return any { $_ =~ $regex } @{ $primer_list };
 }
 
 __PACKAGE__->meta->make_immutable;
