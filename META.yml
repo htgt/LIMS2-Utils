@@ -75,4 +75,4 @@ requires:
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.042
+version: 0.043
