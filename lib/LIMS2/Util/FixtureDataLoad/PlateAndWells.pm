@@ -1,7 +1,7 @@
 package LIMS2::Util::FixtureDataLoad::PlateAndWells;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::FixtureDataLoad::PlateAndWells::VERSION = '0.041';
+    $LIMS2::Util::FixtureDataLoad::PlateAndWells::VERSION = '0.042';
 }
 ## use critic
 

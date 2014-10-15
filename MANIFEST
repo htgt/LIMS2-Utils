@@ -16,6 +16,7 @@ bin/update_gene_solr_index.pl
 lib/LIMS2/Template/Plugin/PasswordGenerator.pm
 lib/LIMS2/Util.pm
 lib/LIMS2/Util/Crisprs.pm
+lib/LIMS2/Util/ESQCUpdateWellAccepted.pm
 lib/LIMS2/Util/EnsEMBL.pm
 lib/LIMS2/Util/Errbit.pm
 lib/LIMS2/Util/FixtureDataLoad.pm

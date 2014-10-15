@@ -1,7 +1,7 @@
 package LIMS2::Util::EnsEMBL;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::EnsEMBL::VERSION = '0.041';
+    $LIMS2::Util::EnsEMBL::VERSION = '0.042';
 }
 ## use critic
 
