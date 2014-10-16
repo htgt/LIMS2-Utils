@@ -220,6 +220,8 @@ for my $name (
         counter_failed_es_cell_ikmc_proj_id_updates
         counter_es_cell_allele_id_updates
         counter_failed_es_cell_allele_id_updates
+        counter_es_cell_targ_vect_updates
+        counter_failed_es_cell_targ_vect_updates
         counter_failed_es_cell_rtp_updates
         counter_es_cell_allele_symb_updates
         counter_failed_es_cell_allele_symb_updates
@@ -369,12 +371,14 @@ sub check_clones_against_tarmits {
     INFO "Count of rows where ES Cell ikmc project ID was updated: "                  .$self->counter_es_cell_ikmc_proj_id_updates;
     INFO "Count of rows where ES Cell allele symbol superscript flag was updated: "   .$self->counter_es_cell_allele_symb_updates;
     INFO "Count of rows where ES Cell allele ID was updated: "                        .$self->counter_es_cell_allele_id_updates;
+    INFO "Count of rows where ES Cell targeting vector ID was updated: "              .$self->counter_es_cell_targ_vect_updates;
     INFO "Count of IGNORED rows for ES Cells: "                                       .$self->counter_ignored_es_cells;
     INFO "---";
     INFO "Count of FAILED rows for ES Cell report to public flag updates: "           .$self->counter_failed_es_cell_rtp_updates;
     INFO "Count of FAILED rows for ES Cell ikmc project ID updates: "                 .$self->counter_failed_es_cell_ikmc_proj_id_updates;
     INFO "Count of FAILED rows for ES Cell allele symbol superscript flag updates: "  .$self->counter_failed_es_cell_allele_symb_updates;
     INFO "Count of FAILED rows for ES Cell allele ID updates: "                       .$self->counter_failed_es_cell_allele_id_updates;
+    INFO "Count of FAILED rows for ES Cell targeting vector ID updates: "             .$self->counter_failed_es_cell_targ_vect_updates;
     INFO "-------------- Tarmits update End ---------------";
 
     return;
@@ -1016,6 +1020,10 @@ sub _check_es_cell_against_tarmits {
             if (!$self->_update_clone_allele_symbol_superscript() ) {
                 ERROR "Failed to update es cell clone allele symbol superscript for clone name: ".$self->curr_clone_name;
             }
+
+            if (!$self->_update_clone_targeting_vector() ) {
+                ERROR "Failed to update es cell clone targeting vector for clone name: ".$self->curr_clone_name;
+            }
         }
 
         # if report to public flag matches clone accepted flag do nothing, but if different then update
@@ -1164,6 +1172,40 @@ sub _update_clone_allele_symbol_superscript {
     catch {
         $self->inc_counter_failed_es_cell_allele_symb_updates;
         ERROR "FAILED allele symbol superscript update for ES Cell clone for gene: ".$self->curr_gene_mgi_id.", es cell clone name: ".$self->curr_clone_name;
+        ERROR "Exception: ".$_;
+    };
+
+    return $update_ok;
+}
+
+sub _update_clone_targeting_vector {
+    my ( $self ) = @_;
+
+    my $update_ok = 0;
+
+    # using this method because the clone has been incorrectly linked to the wrong targeting vector
+
+    try {
+        my $update_clone_params = {
+            'targeting_vector_id'           => $self->curr_targeting_vector_id,
+        };
+
+        # update takes the id of the item plus the updated parameters
+        my $clone_update_resultset = $self->tm->update_es_cell( $self->curr_es_cell_clone_id, $update_clone_params );
+
+        if ( defined $clone_update_resultset && ( $clone_update_resultset->{ 'id' } == $self->curr_es_cell_clone_id ) ) {
+            $self->inc_counter_es_cell_targ_vect_updates;
+            INFO "Updated targeting vector ID for ES cell clone ID: " . $self->curr_es_cell_clone_id . " to value: " . $self->curr_targeting_vector_id;
+            $update_ok = 1;
+        }
+        else {
+            $self->inc_counter_failed_es_cell_targ_vect_updates;
+            WARN "Check on update of targeting vector ID for ES cell clone failed for gene: ".$self->curr_gene_mgi_id.", design: ".$self->curr_design_id.", targeting vector: ".$self->curr_targeting_vector_name.", es cell clone name: ".$self->curr_clone_name;
+        }
+    }
+    catch {
+        $self->inc_counter_failed_es_cell_targ_vect_updates;
+        ERROR "FAILED to update targeting vector ID for ES Cell clone for gene: ".$self->curr_gene_mgi_id.", design: ".$self->curr_design_id.", targeting vector: ".$self->curr_targeting_vector_name.", es cell clone name: ".$self->curr_clone_name;
         ERROR "Exception: ".$_;
     };
 
