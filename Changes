@@ -1,5 +1,8 @@
 {{$NEXT}}
 
+0.044     2014-10-17 15:58:53 Europe/London
+	Modified TarmitsFeed to update es cell targeting vector id
+
 0.043     2014-10-15 13:27:44 Europe/London
 	Modified TarmitsFeed to create allele-based project id and not legacy id
 
