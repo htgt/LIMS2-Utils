@@ -10,6 +10,7 @@ bin/fixture_data_designs.pl
 bin/fixture_data_helper.pl
 bin/fixture_data_plate_wells.pl
 bin/generate_crispr_group_genotyping_primers.pl
+bin/generate_fp_report_cache.pl
 bin/post.sh
 bin/tarmits_feed_wrapper.pl
 bin/update_gene_solr_index.pl

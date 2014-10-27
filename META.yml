@@ -70,9 +70,10 @@ requires:
   TraceServer: 0
   Try::Tiny: 0
   URI: 0
+  WWW::Mechanize: 0
   YAML::Any: 0
   base: 0
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.044
+version: 0.045
