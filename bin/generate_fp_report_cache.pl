@@ -1,5 +1,6 @@
 #!/usr/bin/env perl
 use strict;
+use warnings;
 
 use WWW::Mechanize;
 use Log::Log4perl ':easy';
@@ -19,7 +20,7 @@ Log::Log4perl->easy_init( { level => $log_level, layout => 'fp_cache on %H %d [%
 # If the names of the columns in the top page change, change the entries in link_names
 # otherwise the relevant reports will not be cached.
 
-my @link_names = ( 
+my @link_names = (
     'All',
     'Experimental Cancer Genetics',
     'Mutation',
