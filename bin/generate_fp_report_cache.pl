@@ -48,13 +48,36 @@ foreach my $name ( @link_names ) {
     print $html_file_h $sub_page_html;
     close( $html_file_h )
         or die ERROR "Unable to close $report_file_name: $!";
+    copy_file_to_catalyst( $report_file_name );
 }
+
+INFO 'Completed cache generation for front page reports';
+
+exit();
+
+#================
 
 sub report_file {
     my $this_report = shift;
 
+    $this_report =~ s/\ /_/g;
+
     return $report_name_leader . $this_report . $report_name_trailer;
 }
 
-exit();
+sub copy_file_to_catalyst {
+    my $report_file_name = shift;
+
+    system(
+        'scp',
+        '-q',
+        '-r',
+        '-B',
+        $report_file_name,
+        't87svc@t87-catalyst:' . $report_file_name,
+    );
+    INFO ("Copied report $report_file_name to t87-catalyst");
+    return;
+}
+
 
