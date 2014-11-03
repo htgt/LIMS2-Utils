@@ -44,7 +44,7 @@ has qc_run_results => (
 
 sub _build_qc_run_results {
     my $self = shift;
-    return retrieve_qc_run_results_fast( $self->qc_run, $self->model->schema );
+    return retrieve_qc_run_results_fast( $self->qc_run, $self->model );
 }
 
 # Used to calculate if a wel has mixed reads or not
