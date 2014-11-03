@@ -5,7 +5,7 @@ use warnings;
 use WWW::Mechanize;
 use Log::Log4perl ':easy';
 
-my $report_name_leader = '/var/tmp/lims2-cache-fp-report/';
+my $report_name_leader = '/opt/t87/local/report_cache/lims2_cache_fp_report/';
 my $report_name_trailer = '.html';
 my $front_page_url = 'http://www.sanger.ac.uk/htgt/lims2';
 
@@ -48,7 +48,9 @@ foreach my $name ( @link_names ) {
     print $html_file_h $sub_page_html;
     close( $html_file_h )
         or die ERROR "Unable to close $report_file_name: $!";
-    copy_file_to_catalyst( $report_file_name );
+    if ( $ENV{'HOSTNAME'} eq 't87-batch') {
+        copy_file_to_remote_storage( $report_file_name );
+    }
 }
 
 INFO 'Completed cache generation for front page reports';
@@ -65,7 +67,7 @@ sub report_file {
     return $report_name_leader . $this_report . $report_name_trailer;
 }
 
-sub copy_file_to_catalyst {
+sub copy_file_to_remote_storage {
     my $report_file_name = shift;
 
     system(
@@ -75,8 +77,20 @@ sub copy_file_to_catalyst {
         '-B',
         $report_file_name,
         't87svc@t87-catalyst:' . $report_file_name,
-    );
+    )
+        or die ERROR ("Failed to copy report $report_file_name to t87-catalyst: $?");
+
     INFO ("Copied report $report_file_name to t87-catalyst");
+    system(
+        'scp',
+        '-q',
+        '-r',
+        '-B',
+        $report_file_name,
+        't87svc@t87-dev:' . $report_file_name,
+    )
+        or die ERROR ("Failed to copy report $report_file_name to t87-dev: $?");
+    INFO ("Copied report $report_file_name to t87-dev");
     return;
 }
 
