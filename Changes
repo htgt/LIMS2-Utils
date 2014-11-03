@@ -1,3 +1,7 @@
+0.047     2014-11-03 13:37:19 Europe/London
+
+    Bugfix, subroutine needs LIMS2 Model, not schema.
+
 0.046     2014-10-27 16:08:34 Europe/London
 
     Updated front page report cache to copy files to catalyst
