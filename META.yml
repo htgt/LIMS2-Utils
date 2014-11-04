@@ -76,4 +76,4 @@ requires:
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.047
+version: 0.048

@@ -1,7 +1,7 @@
 package LIMS2::Util::ESQCUpdateWellAccepted;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::ESQCUpdateWellAccepted::VERSION = '0.047';
+    $LIMS2::Util::ESQCUpdateWellAccepted::VERSION = '0.048';
 }
 ## use critic
 
@@ -169,7 +169,7 @@ sub update_well {
         );
     };
 
-    LIMS2::Exceptions->throw( "Can not locate well: $plate_name $well_name") unless $epd_well;
+    LIMS2::Exception->throw( "Can not locate well: $plate_name $well_name") unless $epd_well;
 
     # grap LR PCR primers from well and merge with valid primers list from qc
     my @valid_primers = @{ $well_qc_data->{valid_primers} };

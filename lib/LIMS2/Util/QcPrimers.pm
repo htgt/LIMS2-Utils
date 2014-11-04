@@ -1,7 +1,7 @@
 package LIMS2::Util::QcPrimers;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::QcPrimers::VERSION = '0.047';
+    $LIMS2::Util::QcPrimers::VERSION = '0.048';
 }
 ## use critic
 
@@ -31,7 +31,7 @@ use MooseX::Types::Path::Class::MoreCoercions qw/AbsDir AbsFile/;
 use Try::Tiny;
 use Path::Class;
 use Const::Fast;
-use YAML::Any qw( LoadFile );
+use YAML::Any qw( LoadFile DumpFile );
 
 use namespace::autoclean;
 
@@ -154,6 +154,7 @@ sub crispr_group_genotyping_primers {
     }
 
     $self->log->info( 'SUCCESS: Found primers for target' );
+    DumpFile( $work_dir->file('primers.yaml'), $picked_primers );
 
     if ( $self->persist_primers ) {
         $self->model->txn_do(
