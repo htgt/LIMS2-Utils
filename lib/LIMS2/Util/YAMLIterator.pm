@@ -1,7 +1,7 @@
 package LIMS2::Util::YAMLIterator;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::YAMLIterator::VERSION = '0.048';
+    $LIMS2::Util::YAMLIterator::VERSION = '0.049';
 }
 ## use critic
 

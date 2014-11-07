@@ -1,7 +1,7 @@
 package LIMS2::Util::TarmitsFeedCreKnockin;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::TarmitsFeedCreKnockin::VERSION = '0.048';
+    $LIMS2::Util::TarmitsFeedCreKnockin::VERSION = '0.049';
 }
 ## use critic
 
