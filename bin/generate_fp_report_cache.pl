@@ -7,8 +7,11 @@ use Log::Log4perl ':easy';
 
 my $report_name_leader = '/opt/t87/local/report_cache/lims2_cache_fp_report/';
 my $report_name_trailer = '.html';
-my $front_page_url = ($ENV{ 'LIMS2_CACHE_SERVER' } || 'http://www.sanger.ac.uk/htgt/lims2/public_reports/sponsor_report?cache_param=without_cache');
-# Will not compile with // operator
+my $csv_name_trailer = '.csv';
+my %front_page_url = (
+    'human' => ($ENV{ 'LIMS2_HUMAN_CACHE_SERVER' } || 'http://www.sanger.ac.uk/htgt/lims2/public_reports/sponsor_report?generate_cache=1&species=Human'),
+    'mouse' => ($ENV{ 'LIMS2_MOUSE_CACHE_SERVER' } || 'http://www.sanger.ac.uk/htgt/lims2/public_reports/sponsor_report?generate_cache=1&species=Mouse'),
+);
 
 # Write an html cache of the front page sub-reports
 my $mech = WWW::Mechanize->new();
@@ -40,7 +43,8 @@ my @mouse_link_names = (
 );
 
 INFO 'Generating front page report cache...';
-INFO 'Using URL: ' . $front_page_url;
+INFO 'Using Human URL: ' . $front_page_url{'human'};
+INFO 'Using Mouse URL: ' . $front_page_url{'mouse'};
 
 cache_reports( 'human', @human_link_names);
 cache_reports( 'mouse', @mouse_link_names);
@@ -60,33 +64,21 @@ sub cache_reports {
         INFO '.... ' . $name;
     }
 
-    my $first_time_human = 1;
-    my $first_time_mouse = 1;
+    my $first_time_species = 1;
 
     foreach my $name ( @link_names ) {
         my $r; # The server's HTTP::Response
-        INFO 'Fetch top level page...';
-        $r = $mech->get( $front_page_url );
+        INFO 'Fetch top level ' . $species . ' page...';
+        $r = $mech->get( $front_page_url{$species} );
         server_responder( $r );
-        if ( $first_time_human ) {
+        if ( $first_time_species ) {
             cache_front_page( $mech, $species );
-            $first_time_human = 0;
-            # Now we have changed the content so we now need to 
-        }
-        if ( $species eq 'mouse' ) {
-            INFO 'Fetch mouse page...';
-            $r = $mech->follow_link( url_regex => qr/species=Mouse/ );
-            server_responder( $r );
-            if ( $first_time_mouse ) {
-                cache_front_page( $mech, $species );
-                $first_time_mouse = 0;
-            }
         }
         INFO 'Fetching page for ' . $name . ' report...';
         $r = $mech->follow_link( url_regex => qr/$name/ );
         server_responder( $r );
         cache_sub_page( $mech, $name );
-#        cache_csv_content( $mech, $name );
+        cache_csv_content( $mech, $name );
     }
     return;
 }
@@ -109,6 +101,7 @@ sub cache_sub_page {
     my $species = shift;
 
     my $content = $mech->content();
+    $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes/cached_sponsor_csv\/$1/g;
     $content =~ s/without_cache/with_cache/g;
     cache_report_content( $content, $species );
     return;
@@ -135,8 +128,8 @@ sub cache_csv_content {
     my $mech = shift;
     my $name = shift;
 
-$DB::single=1;
-    my $r = $mech->click( name => 'csv_download' );
+    INFO 'Generating csv for ' . $name . ' report';
+    my $r = $mech->follow_link( url_regex => qr/csv=1/ );
     server_responder( $r );
 
     my $csv_page = $mech->content();
@@ -174,6 +167,15 @@ sub report_file {
     return $report_name_leader . $this_report . $report_name_trailer;
 }
 
+sub csv_file {
+    my $this_csv = shift;
+
+    $this_csv =~ s/\ /_/g;
+
+    return $report_name_leader . $this_csv . $csv_name_trailer;
+}
+
+
 sub copy_file_to_remote_storage {
     my $report_file_name = shift;
 
@@ -188,16 +190,6 @@ sub copy_file_to_remote_storage {
         or die ERROR ("Failed to copy report $report_file_name to t87-catalyst: $?");
 
     INFO ("Copied report $report_file_name to t87-catalyst");
-    system(
-        'scp',
-        '-q',
-        '-r',
-        '-B',
-        $report_file_name,
-        't87svc@t87-dev:' . $report_file_name,
-    )
-        or die ERROR ("Failed to copy report $report_file_name to t87-dev: $?");
-    INFO ("Copied report $report_file_name to t87-dev");
     return;
 }
 
