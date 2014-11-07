@@ -14,7 +14,6 @@ my %front_page_url = (
 );
 
 # Write an html cache of the front page sub-reports
-my $mech = WWW::Mechanize->new();
 
 
 my $log_level = $INFO;
@@ -59,6 +58,8 @@ sub cache_reports {
     my $species = shift;
     my @link_names = @_;
 
+    my $mech = WWW::Mechanize->new();
+
     INFO "..will cache these $species reports:";
     foreach my $name ( @link_names ) {
         INFO '.... ' . $name;
@@ -93,7 +94,7 @@ sub cache_front_page {
     $content =~ s/without_cache/with_cache/g;
     cache_report_content( $content, $species );
 
-    return; 
+    return;
 }
 
 sub cache_sub_page {
