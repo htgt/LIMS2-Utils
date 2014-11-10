@@ -3,6 +3,7 @@ use strict;
 use warnings;
 
 use WWW::Mechanize;
+use Sys::Hostname;
 use Log::Log4perl ':easy';
 
 my $report_name_leader = '/opt/t87/local/report_cache/lims2_cache_fp_report/';
@@ -119,7 +120,8 @@ sub cache_report_content {
     print $html_file_h $sub_page_html;
     close( $html_file_h )
         or die ERROR "Unable to close $report_file_name: $!";
-    if ( $ENV{'HOSTNAME'} eq 't87-batch') {
+    my $host = hostname;
+    if ( $host eq 't87-batch' ) { # t87-batch does not seem able to access $ENV{'HOSTNAME'}!
         copy_file_to_remote_storage( $report_file_name );
     }
     return;
@@ -141,7 +143,8 @@ sub cache_csv_content {
     print $csv_file_h $csv_page;
     close( $csv_file_h )
         or die ERROR "Unable to close $csv_file_name: $!";
-    if ( $ENV{'HOSTNAME'} eq 't87-batch') {
+    my $host = hostname;
+    if ( $host eq 't87-batch' ) { # t87-batch does not seem able to access $ENV{'HOSTNAME'}!
         copy_file_to_remote_storage( $csv_file_name );
     }
 

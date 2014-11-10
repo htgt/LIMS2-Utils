@@ -65,6 +65,7 @@ requires:
   Readonly: 0
   Scalar::Util: 0
   Sub::Exporter: 0
+  Sys::Hostname: 0
   Template: 0
   Template::Plugin: 0
   TraceServer: 0
@@ -76,4 +77,4 @@ requires:
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.049
+version: 0.050

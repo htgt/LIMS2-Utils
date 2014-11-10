@@ -84,6 +84,7 @@ my %WriteMakefileArgs = (
     "Readonly" => 0,
     "Scalar::Util" => 0,
     "Sub::Exporter" => 0,
+    "Sys::Hostname" => 0,
     "Template" => 0,
     "Template::Plugin" => 0,
     "TraceServer" => 0,
@@ -96,7 +97,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.049",
+  "VERSION" => "0.050",
   "test" => {
     "TESTS" => "t/*.t"
   }
