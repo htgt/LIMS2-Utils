@@ -75,6 +75,7 @@ sub cache_reports {
         server_responder( $r );
         if ( $first_time_species ) {
             cache_front_page( $mech, $species );
+            $first_time_species = 0;
         }
         INFO 'Fetching page for ' . $name . ' report...';
         $r = $mech->follow_link( url_regex => qr/$name/ );
