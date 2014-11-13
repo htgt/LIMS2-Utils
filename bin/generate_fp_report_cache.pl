@@ -183,17 +183,19 @@ sub csv_file {
 sub copy_file_to_remote_storage {
     my $report_file_name = shift;
 
-    system(
+    if (system(
         'scp',
         '-q',
         '-r',
         '-B',
         $report_file_name,
         't87svc@t87-catalyst:' . $report_file_name,
-    )
-        or ERROR ("Failed to copy report $report_file_name to t87-catalyst: $?");
-
-    INFO ("Copied report $report_file_name to t87-catalyst");
+    )){
+        ERROR ("Failed to copy report $report_file_name to t87-catalyst: $?");
+    }
+    else {
+        INFO ("Copied report $report_file_name to t87-catalyst");
+    }
     return;
 }
 
