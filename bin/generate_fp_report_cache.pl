@@ -191,7 +191,7 @@ sub copy_file_to_remote_storage {
         $report_file_name,
         't87svc@t87-catalyst:' . $report_file_name,
     )
-        or die ERROR ("Failed to copy report $report_file_name to t87-catalyst: $?");
+        or ERROR ("Failed to copy report $report_file_name to t87-catalyst: $?");
 
     INFO ("Copied report $report_file_name to t87-catalyst");
     return;
