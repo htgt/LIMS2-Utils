@@ -1,0 +1,80 @@
+---
+abstract: 'Utilities for LIMS2'
+author:
+  - 'Ray Miller <rm7@sanger.ac.uk>'
+build_requires:
+  English: 0
+  File::Find: 0
+  Test::More: 0.88
+  Test::Most: 0
+configure_requires:
+  ExtUtils::MakeMaker: 6.30
+dynamic_config: 0
+generated_by: 'Dist::Zilla version 4.300014, CPAN::Meta::Converter version 2.120921'
+license: perl
+meta-spec:
+  url: http://module-build.sourceforge.net/META-spec-v1.4.html
+  version: 1.4
+name: LIMS2-Util
+requires:
+  Bio::EnsEMBL::Registry: 0
+  Bio::Perl: 0
+  Carp: 0
+  Class::Data::Inheritable: 0
+  Config::Any: 0
+  Const::Fast: 0
+  Data::Dumper: 0
+  EngSeqBuilder: 0
+  File::Temp: 0
+  Getopt::Long: 0
+  HTGT::QC::Util::GeneratePrimersAttempts: 0
+  HTML::Entities: 0
+  HTTP::Request: 0
+  Hash::MoreUtils: 0
+  IO::File: 0
+  IO::String: 0
+  IPC::Run: 0
+  Iterator::Simple: 0
+  JSON: 0
+  LIMS2::Exception: 0
+  LIMS2::Model: 0
+  LIMS2::Model::Constants: 0
+  LIMS2::Model::DBConnect: 0
+  LIMS2::Model::Util::DesignInfo: 0
+  LIMS2::Model::Util::DesignTargets: 0
+  LIMS2::Model::Util::EngSeqParams: 0
+  LIMS2::Model::Util::QCResults: 0
+  LIMS2::REST::Client: 0
+  LIMS2::Test: 0
+  LWP::Simple: 0
+  LWP::UserAgent: 0
+  List::MoreUtils: 0
+  List::Util: 0
+  Log::Log4perl: 0
+  Moose: 0
+  Moose::Util::TypeConstraints: 0
+  MooseX::ClassAttribute: 0
+  MooseX::Log::Log4perl: 0
+  MooseX::SimpleConfig: 0
+  MooseX::Types::Path::Class: 0
+  MooseX::Types::Path::Class::MoreCoercions: 0
+  MooseX::Types::URI: 0
+  Path::Class: 0
+  Perl6::Slurp: 0
+  Pod::Usage: 0
+  Readonly: 0
+  Scalar::Util: 0
+  Sub::Exporter: 0
+  Sys::Hostname: 0
+  Template: 0
+  Template::Plugin: 0
+  TraceServer: 0
+  Try::Tiny: 0
+  URI: 0
+  WWW::Mechanize: 0
+  YAML::Any: 0
+  base: 0
+  namespace::autoclean: 0
+  strict: 0
+  warnings: 0
+version: 0.053

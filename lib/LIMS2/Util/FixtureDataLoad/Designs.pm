@@ -1,4 +1,10 @@
 package LIMS2::Util::FixtureDataLoad::Designs;
+## no critic(RequireUseStrict,RequireUseWarnings)
+{
+    $LIMS2::Util::FixtureDataLoad::Designs::VERSION = '0.053';
+}
+## use critic
+
 
 use warnings FATAL => 'all';
 
