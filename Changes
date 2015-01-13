@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.053     2015-01-13 16:56:46 Europe/London
+
+    Cached Sponsor Report generation script modified to support staging and devel servers
+
 0.052     2014-11-13 17:01:17 Europe/London
 
     Corrected multiple write of top level page
