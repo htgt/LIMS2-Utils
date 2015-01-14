@@ -15,7 +15,7 @@ Log::Log4perl->easy_init( { level => $log_level, layout => 'fp_cache on %H %d [%
 
 # get args
 
-my $cache_server;
+my $cache_server = 'production';
 GetOptions(
     'help'           => sub { pod2usage( -verbose    => 1 ) },
     'man'            => sub { pod2usage( -verbose    => 2 ) },
