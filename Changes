@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.055     2015-01-20 09:28:26 Europe/London
+
+Add method to WGE api to generate off targets by sequence.
+
 0.054     2015-01-14 10:17:38 Europe/London
 
     Cached Sponsor Report generation script defaults to --cache_server production
