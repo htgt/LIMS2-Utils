@@ -152,6 +152,25 @@ sub _calculate_wge_species_id {
     return;
 }
 
+sub off_target_by_seq {
+    my ( $self, $seq, $pam_right, $species ) = @_;
+
+    my $ot_data;
+    try {
+        $ot_data = $self->rest_client->GET( 'off_targets_by_seq', {
+            seq       => $seq,
+            pam_right => $pam_right,
+            species   => $species,
+        } );
+    }
+    catch {
+        $self->log->error( "Error generating crispr off target data: " . $_ );
+        LIMS2::Exception->throw( "Error generating crispr off target data: " . $_ );
+    };
+
+    return $ot_data;
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
