@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.054     2015-01-14 10:17:38 Europe/London
+
+    Cached Sponsor Report generation script defaults to --cache_server production
+
 0.053     2015-01-13 16:56:46 Europe/London
 
     Cached Sponsor Report generation script modified to support staging and devel servers
