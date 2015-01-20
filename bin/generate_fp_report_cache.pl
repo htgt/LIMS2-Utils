@@ -5,21 +5,55 @@ use warnings;
 use WWW::Mechanize;
 use Sys::Hostname;
 use Log::Log4perl ':easy';
-
-my $report_name_leader = '/opt/t87/local/report_cache/lims2_cache_fp_report/';
-my $report_name_trailer = '.html';
-my $csv_name_trailer = '.csv';
-my %front_page_url = (
-    'human' => ($ENV{ 'LIMS2_HUMAN_CACHE_SERVER' } || 'http://www.sanger.ac.uk/htgt/lims2/public_reports/sponsor_report?generate_cache=1&species=Human'),
-    'mouse' => ($ENV{ 'LIMS2_MOUSE_CACHE_SERVER' } || 'http://www.sanger.ac.uk/htgt/lims2/public_reports/sponsor_report?generate_cache=1&species=Mouse'),
-);
-
-# Write an html cache of the front page sub-reports
-
+use Getopt::Long;
+use Pod::Usage;
 
 my $log_level = $INFO;
 
 Log::Log4perl->easy_init( { level => $log_level, layout => 'fp_cache on %H %d [%p]  %m%n', } );
+
+
+# get args
+
+my $cache_server = 'production';
+GetOptions(
+    'help'           => sub { pod2usage( -verbose    => 1 ) },
+    'man'            => sub { pod2usage( -verbose    => 2 ) },
+    'cache_server=s' => \$cache_server,
+    'debug'          => sub { $log_level = $DEBUG },
+) or pod2usage(2);
+
+
+# from the provided args get the webapp url, default to live
+
+my $base_path;
+for ($cache_server) {
+    if    (/production/) { INFO "Selected $cache_server server";
+                            $base_path = "http://www.sanger.ac.uk/htgt/lims2"; }
+    elsif (/staging/)    { INFO "Selected $cache_server server";
+                            $base_path = "http://www.sanger.ac.uk/htgt/lims2/staging"; }
+    elsif (/^\d+$/)      { INFO "Selected t87-dev server on port $cache_server";
+                            $base_path = "http://t87-dev.internal.sanger.ac.uk:$cache_server"; }
+    else                 { die ERROR "Invalid cache_server provided. valid options: production, staging, and a port number for t87-dev." }
+}
+
+
+# create folder if does not exist
+
+my $report_name_leader = "/opt/t87/local/report_cache/lims2_cache_fp_report/$cache_server/";
+unless(-d $report_name_leader){
+    mkdir $report_name_leader or die ERROR "Cannot create folder $report_name_leader";
+}
+
+my $report_name_trailer = '.html';
+my $csv_name_trailer = '.csv';
+my %front_page_url = (
+    'human' => ("$base_path/public_reports/sponsor_report?generate_cache=1&species=Human"),
+    'mouse' => ("$base_path/public_reports/sponsor_report?generate_cache=1&species=Mouse"),
+);
+
+# Write an html cache of the front page sub-reports
+
 
 # If the names of the columns in the top page change, change the entries in link_names
 # otherwise the relevant reports will not be cached.
@@ -75,6 +109,7 @@ sub cache_reports {
         server_responder( $r );
         if ( $first_time_species ) {
             cache_front_page( $mech, $species );
+            $first_time_species = 0;
         }
         INFO 'Fetching page for ' . $name . ' report...';
         $r = $mech->follow_link( url_regex => qr/$name/ );
@@ -183,18 +218,50 @@ sub csv_file {
 sub copy_file_to_remote_storage {
     my $report_file_name = shift;
 
-    system(
+    if (system(
         'scp',
         '-q',
         '-r',
         '-B',
         $report_file_name,
         't87svc@t87-catalyst:' . $report_file_name,
-    )
-        or die ERROR ("Failed to copy report $report_file_name to t87-catalyst: $?");
-
-    INFO ("Copied report $report_file_name to t87-catalyst");
+    )){
+        ERROR ("Failed to copy report $report_file_name to t87-catalyst: $?");
+    }
+    else {
+        INFO ("Copied report $report_file_name to t87-catalyst");
+    }
     return;
 }
 
+__END__
 
+=head1 NAME
+
+generate_fp_report_cache.pl - regenerates the cached front page report.
+
+=head1 SYNOPSIS
+
+  generate_fp_report_cache.pl [options]
+
+      --help            Display a brief help message
+      --man             Display the manual page
+      --debug           Debug output
+      --cache_server    Sets the cache_server. Default production, staging optional, port number for t87-dev devel.
+
+IMPORTANT:
+LIMS2_CACHE_SERVER env variable can be set to production, staging, or a port number that will represent the t87-dev port server to be used.
+By default production is used.
+
+=head1 DESCRIPTION
+
+Transfer one bac, plus all its associated data from one database to another.
+Used to help generate fixture data for test.
+
+=head1 BUGS
+
+None reported... yet.
+
+=head1 TODO
+
+=cut

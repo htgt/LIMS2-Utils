@@ -1,5 +1,21 @@
 {{$NEXT}}
 
+0.053     2015-01-13 16:56:46 Europe/London
+
+    Cached Sponsor Report generation script modified to support staging and devel servers
+
+0.052     2014-11-13 17:01:17 Europe/London
+
+    Corrected multiple write of top level page
+
+0.051     2014-11-13 14:25:59 Europe/London
+
+    Continue processing on scp error
+
+0.050     2014-11-10 16:18:45 Europe/London
+
+    Changed hostname lookup
+
 0.049     2014-11-07 13:45:25 Europe/London
 
 Completed caching of front page and sub-reports with csv files
