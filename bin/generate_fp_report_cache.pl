@@ -160,6 +160,8 @@ sub cache_sub_page_full {
     $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes[^>]*csv=1/cached_sponsor_csv\/$1/g;
     $content =~ s/without_cache/with_cache/g;
 
+    $content =~ s/[^:]\/\/+/\//g;
+
     my $report_file_name = report_file_full( $species );
     INFO 'Writing html for ' . $species . ' full report to ' . $report_file_name;
     open( my $html_file_h, ">:encoding(UTF-8)", $report_file_name )
