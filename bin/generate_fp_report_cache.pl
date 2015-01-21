@@ -130,6 +130,8 @@ sub cache_front_page {
 
     $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes/cached_sponsor_report\/$1/g;
     $content =~ s/without_cache/with_cache/g;
+    $content =~ s/[^:]\/\/+/\//g;
+
     cache_report_content( $content, $species );
 
     return;
@@ -143,6 +145,8 @@ sub cache_sub_page {
     $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes[^>]*type=full/cached_sponsor_report_full\/$1/g;
     $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes[^>]*csv=1/cached_sponsor_csv\/$1/g;
     $content =~ s/without_cache/with_cache/g;
+    $content =~ s/[^:]\/\/+/\//g;
+
     cache_report_content( $content, $species );
     return;
 }
@@ -154,11 +158,13 @@ sub cache_sub_page_full {
     my $r = $mech->follow_link( url_regex => qr/type=full/ );
     server_responder( $r );
 
-
     my $content = $mech->content();
     $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes[^>]*type=simple/cached_sponsor_report\/$1/g;
     $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes[^>]*csv=1/cached_sponsor_csv\/$1/g;
     $content =~ s/without_cache/with_cache/g;
+    $content =~ s/[^:]\/\/+/\//g;
+
+    $content =~ s/[^:]\/\/+/\//g;
 
     my $report_file_name = report_file_full( $species );
     INFO 'Writing html for ' . $species . ' full report to ' . $report_file_name;
