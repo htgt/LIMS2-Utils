@@ -46,6 +46,7 @@ unless(-d $report_name_leader){
 }
 
 my $report_name_trailer = '.html';
+my $report_name_trailer_full = '_full.html';
 my $csv_name_trailer = '.csv';
 my %front_page_url = (
     'human' => ("$base_path/public_reports/sponsor_report?generate_cache=1&species=Human"),
@@ -115,6 +116,7 @@ sub cache_reports {
         $r = $mech->follow_link( url_regex => qr/$name/ );
         server_responder( $r );
         cache_sub_page( $mech, $name );
+        cache_sub_page_full( $mech, $name );
         cache_csv_content( $mech, $name );
     }
     return;
@@ -138,9 +140,38 @@ sub cache_sub_page {
     my $species = shift;
 
     my $content = $mech->content();
-    $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes/cached_sponsor_csv\/$1/g;
+    $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes[^>]*type=full/cached_sponsor_report_full\/$1/g;
+    $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes[^>]*csv=1/cached_sponsor_csv\/$1/g;
     $content =~ s/without_cache/with_cache/g;
     cache_report_content( $content, $species );
+    return;
+}
+
+sub cache_sub_page_full {
+    my $mech = shift;
+    my $species = shift;
+
+    my $r = $mech->follow_link( url_regex => qr/type=full/ );
+    server_responder( $r );
+
+
+    my $content = $mech->content();
+    $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes[^>]*type=simple/cached_sponsor_report\/$1/g;
+    $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes[^>]*csv=1/cached_sponsor_csv\/$1/g;
+    $content =~ s/without_cache/with_cache/g;
+
+    my $report_file_name = report_file_full( $species );
+    INFO 'Writing html for ' . $species . ' full report to ' . $report_file_name;
+    open( my $html_file_h, ">:encoding(UTF-8)", $report_file_name )
+        or die ERROR "Unable to open $report_file_name: $!";
+    print $html_file_h $content;
+    close( $html_file_h )
+        or die ERROR "Unable to close $report_file_name: $!";
+    my $host = hostname;
+    if ( $host eq 't87-batch' ) { # t87-batch does not seem able to access $ENV{'HOSTNAME'}!
+        copy_file_to_remote_storage( $report_file_name );
+    }
+
     return;
 }
 
@@ -149,7 +180,7 @@ sub cache_report_content {
     my $name = shift;
 
     my $report_file_name = report_file( $name );
-    INFO 'Writing html for ' . $name . ' report to ' . $report_file_name;
+    INFO 'Writing html for ' . $name . ' simple report to ' . $report_file_name;
     open( my $html_file_h, ">:encoding(UTF-8)", $report_file_name )
         or die ERROR "Unable to open $report_file_name: $!";
     print $html_file_h $sub_page_html;
@@ -161,6 +192,7 @@ sub cache_report_content {
     }
     return;
 }
+
 
 sub cache_csv_content {
     my $mech = shift;
@@ -205,6 +237,15 @@ sub report_file {
 
     return $report_name_leader . $this_report . $report_name_trailer;
 }
+
+sub report_file_full {
+    my $this_report = shift;
+
+    $this_report =~ s/\ /_/g;
+
+    return $report_name_leader . $this_report . $report_name_trailer_full;
+}
+
 
 sub csv_file {
     my $this_csv = shift;
