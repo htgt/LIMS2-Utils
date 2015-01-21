@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.056     2015-01-21 11:30:13 Europe/London
+
+    Added support for caching of full fs reports
+
 0.055     2015-01-20 09:28:26 Europe/London
 
 Add method to WGE api to generate off targets by sequence.
