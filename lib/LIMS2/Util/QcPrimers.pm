@@ -26,6 +26,7 @@ use Try::Tiny;
 use Path::Class;
 use Const::Fast;
 use YAML::Any qw( LoadFile DumpFile );
+use Data::Dumper;
 
 use namespace::autoclean;
 
@@ -36,6 +37,8 @@ my %PRIMER_PROJECT_CONFIG_FILES = (
             || '/opt/t87/global/conf/primers/mgp_recovery_genotyping.yaml',
     short_arm_vectors => $ENV{SHORT_ARM_VECTOR_GENOTYPING_PRIMER_CONFIG}
             || '/opt/t87/global/conf/primers/short_arm_vector_genotyping.yaml',
+    crispr_pair => $ENV{CRISPR_PAIR_GENOTYPING_PRIMER_CONFIG}
+            || '/nfs/users/nfs_a/af11/LIMS2-tmp/crispr_pair_primer_conf.yaml',
 );
 
 has model => (
@@ -65,7 +68,10 @@ has config => (
 
 sub _build_config {
     my $self = shift;
-    return LoadFile( $PRIMER_PROJECT_CONFIG_FILES{ $self->primer_project_name } );
+    $self->log->info("using config file ".$PRIMER_PROJECT_CONFIG_FILES{ $self->primer_project_name });
+    my $config = LoadFile( $PRIMER_PROJECT_CONFIG_FILES{ $self->primer_project_name } );
+    $self->log->info("Config loaded: ",Dumper($config));
+    return $config;
 }
 
 has base_dir => (
@@ -83,8 +89,9 @@ has primer3_config_file => (
 
 sub _build_primer3_config_file {
     my $self = shift;
-
+    $self->log->info(Dumper($self->config));
     if ( my $file_name = $self->config->{primer3_config} ) {
+        $self->log->info("Using primer3 config file $file_name");
         return file( $file_name )->absolute;
     }
     else {
@@ -101,6 +108,115 @@ has persist_primers => (
     default => 0,
 );
 
+# List of field names that we want to output for each primer type
+has primer_output_fields => (
+    is      => 'ro',
+    isa     => 'ArrayRef',
+    default => sub{ [qw(seq strand length gc_content tm)] },
+);
+
+# Methods to generate these outputs given a single primer's
+# hashref from the primer finder
+has primer_output_methods => (
+    is      => 'ro',
+    isa     => 'HashRef',
+    lazy_build => 1,
+);
+
+sub _build_primer_output_methods {
+    my $self = shift;
+
+    my $methods = {
+        seq    => sub{ shift->{oligo_seq} },
+        strand => sub{ shift->{oligo_direction } },
+        length => sub{ shift->{oligo_length} },
+        gc_content => sub{ shift->{gc_content} },
+        tm         => sub{ shift->{melting_temp} },
+    };
+
+    return $methods;
+}
+
+has output_headings => (
+     is         => 'ro',
+     isa        => 'ArrayRef',
+     lazy_build => 1,
+);
+
+sub _build_output_headings {
+    my $self = shift;
+
+    my @headings;
+    foreach my $type ( qw(forward reverse internal) ){
+        my $primer_name = $self->config->{primer_names}->{$type};
+        next unless $primer_name;
+        foreach my $field_type (@{ $self->primer_output_fields}){
+            push @headings, $primer_name."_".$field_type;
+        }
+    }
+    return \@headings;
+}
+
+has output_methods => (
+    is          => 'ro',
+    isa         => 'HashRef',
+    lazy_build  => 1,
+);
+
+sub _build_output_methods {
+    my $self = shift;
+    my $methods;
+
+    foreach my $type ( qw(forward reverse internal) ){
+        my $primer_name = $self->config->{primer_names}->{$type};
+        next unless $primer_name;
+        foreach my $field_type (@{ $self->primer_output_fields}){
+            my $field_name = $primer_name."_".$field_type; # e.g. SR1_gc_content
+            $methods->{$field_name} = sub {
+                my $primer = shift->{$type}; # e.g. get the reverse primer for SR1
+                # e.g. apply the gc_content fetcher method to the reverse primer
+                return $self->primer_output_methods->{$field_type}->($primer);
+            }
+        }
+    }
+    return $methods;
+}
+
+=head2 get_new_primer_finder
+
+Constructs GeneratePrimersAttempts objects
+input:
+  working directory
+  Crispr, CrisprPair or CrisprGroup
+  strand
+
+=cut
+
+sub get_new_primer_finder {
+    my ($self, $work_dir, $crispr_collection, $strand) = @_;
+$self->log->info("target start on chr: ".$crispr_collection->start);
+$self->log->info("target end on chr: ".$crispr_collection->end);
+$self->log->info("target region length: ".($crispr_collection->end - $crispr_collection->start));
+    my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new(
+        base_dir                    => $work_dir,
+        species                     => $crispr_collection->species,
+        strand                      => $strand,
+        chromosome                  => $crispr_collection->chr_name,
+        target_start                => $crispr_collection->start,
+        target_end                  => $crispr_collection->end,
+        primer3_config_file         => $self->primer3_config_file,
+        five_prime_region_size      => $self->config->{five_prime_region_size},
+        five_prime_region_offset    => $self->config->{five_prime_region_offset},
+        three_prime_region_size     => $self->config->{three_prime_region_size},
+        three_prime_region_offset   => $self->config->{three_prime_region_offset},
+        primer_search_region_expand => $self->config->{primer_search_region_expand},
+        check_genomic_specificity   => ($self->config->{check_genomic_specificity} // 1),
+        retry_attempts => 1,
+    );
+
+    return $primer_finder;
+}
+
 =head2 crispr_group_genotyping_primers
 
 Generate a pair of primers plus a internal primer for a given crispr group.
@@ -115,20 +231,8 @@ sub crispr_group_genotyping_primers {
     $work_dir->mkpath;
 
     $self->log->info( 'Searching for External Primers' );
-    my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new(
-        base_dir                    => $work_dir,
-        species                     => $crispr_group->species,
-        strand                      => 1, # always global +ve strand
-        chromosome                  => $crispr_group->chr_name,
-        target_start                => $crispr_group->start,
-        target_end                  => $crispr_group->end,
-        primer3_config_file         => $self->primer3_config_file,
-        five_prime_region_size      => $self->config->{five_prime_region_size},
-        five_prime_region_offset    => $self->config->{five_prime_region_offset},
-        three_prime_region_size     => $self->config->{three_prime_region_size},
-        three_prime_region_offset   => $self->config->{three_prime_region_offset},
-        primer_search_region_expand => $self->config->{primer_search_region_expand},
-    );
+    my $strand = 1; # always global +ve strand
+    my $primer_finder = $self->get_new_primer_finder($work_dir, $crispr_group, $strand);
 
     my ( $primer_data, $seq ) = $primer_finder->find_primers;
 
@@ -159,6 +263,45 @@ sub crispr_group_genotyping_primers {
     }
 
     return ( $picked_primers, $seq );
+}
+
+=head2 crispr_pair_genotyping_primers
+
+Generate a pair of primers for a given crispr pair.
+
+=cut
+sub crispr_pair_genotyping_primers {
+    my ( $self, $crispr_pair ) = @_;
+    $self->log->info( '====================' );
+    $self->log->info( "GENERATE PRIMERS for $crispr_pair, gene_id: " . $crispr_pair->gene_id );
+
+    my $work_dir = $self->base_dir->subdir( 'crispr_pair_genotyping_' . $crispr_pair->id )->absolute;
+    $work_dir->mkpath;
+
+    $self->log->info( 'Searching for Primers' );
+    my $strand = 1; # always global +ve strand
+    my $primer_finder = $self->get_new_primer_finder($work_dir, $crispr_pair, $strand);
+
+    my ( $primer_data, $seq ) = $primer_finder->find_primers;
+
+    unless ( $primer_data ) {
+        $self->log->error( 'FAIL: Unable to generate primer pair for crispr pair' );
+        return;
+    }
+
+    $self->log->info( 'SUCCESS: Found primers for target' );
+    DumpFile( $work_dir->file('primers.yaml'), $primer_data );
+
+    ## FIXME: check if this will work with crispr pair
+    if ( $self->persist_primers ) {
+        $self->model->txn_do(
+            sub {
+                $self->persist_crispr_primer_data( $primer_data, $crispr_pair );
+            }
+        );
+    }
+
+    return ( $primer_data, $seq );
 }
 
 =head2 find_internal_primer
@@ -273,6 +416,33 @@ sub persist_crispr_primer_data {
     }
 
     return;
+}
+
+=head2 get_output_headings
+
+    return array ref of field names to use as column headings in output
+
+=cut
+
+sub get_output_headings {
+    return shift->output_headings;
+}
+
+=head2 get_output_values
+
+   return hash ref of values for the fields in the output_headings array
+   requires one of the primer set hashrefs from primer_data array as input
+
+=cut
+
+sub get_output_values{
+    my ($self, $primer_data) = @_;
+    my $values;
+
+    while ( my($field_name, $method) = each %{ $self->output_methods }){
+        $values->{$field_name} = $method->($primer_data);
+    }
+    return $values;
 }
 
 =head2 calculate_product_size_avoid
