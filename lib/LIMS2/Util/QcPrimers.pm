@@ -37,7 +37,7 @@ my %PRIMER_PROJECT_CONFIG_FILES = (
             || '/opt/t87/global/conf/primers/mgp_recovery_genotyping.yaml',
     short_arm_vectors => $ENV{SHORT_ARM_VECTOR_GENOTYPING_PRIMER_CONFIG}
             || '/opt/t87/global/conf/primers/short_arm_vector_genotyping.yaml',
-    crispr_pair => $ENV{CRISPR_PAIR_GENOTYPING_PRIMER_CONFIG}
+    crispr_single_or_pair => $ENV{CRISPR_PAIR_GENOTYPING_PRIMER_CONFIG}
             || '/nfs/users/nfs_a/af11/LIMS2-tmp/crispr_pair_primer_conf.yaml',
 );
 
@@ -199,7 +199,7 @@ $self->log->info("target end on chr: ".$crispr_collection->end);
 $self->log->info("target region length: ".($crispr_collection->end - $crispr_collection->start));
     my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new(
         base_dir                    => $work_dir,
-        species                     => $crispr_collection->species,
+        species                     => $crispr_collection->species_id,
         strand                      => $strand,
         chromosome                  => $crispr_collection->chr_name,
         target_start                => $crispr_collection->start,
@@ -211,6 +211,7 @@ $self->log->info("target region length: ".($crispr_collection->end - $crispr_col
         three_prime_region_offset   => $self->config->{three_prime_region_offset},
         primer_search_region_expand => $self->config->{primer_search_region_expand},
         check_genomic_specificity   => ($self->config->{check_genomic_specificity} // 1),
+        product_contains_region_offsets => ($self->config->{product_contains_region_offsets} // 0),
         retry_attempts => 1,
     );
 
@@ -270,33 +271,33 @@ sub crispr_group_genotyping_primers {
 Generate a pair of primers for a given crispr pair.
 
 =cut
-sub crispr_pair_genotyping_primers {
-    my ( $self, $crispr_pair ) = @_;
+sub crispr_single_or_pair_genotyping_primers {
+    my ( $self, $crispr_single_or_pair ) = @_;
     $self->log->info( '====================' );
-    $self->log->info( "GENERATE PRIMERS for $crispr_pair, gene_id: " . $crispr_pair->gene_id );
+    $self->log->info( "GENERATE PRIMERS for $crispr_single_or_pair, gene_id: " . $crispr_single_or_pair->gene_id );
 
-    my $work_dir = $self->base_dir->subdir( 'crispr_pair_genotyping_' . $crispr_pair->id )->absolute;
+    my $work_dir = $self->base_dir->subdir( 'crispr_genotyping_' . $crispr_single_or_pair->id )->absolute;
     $work_dir->mkpath;
 
     $self->log->info( 'Searching for Primers' );
     my $strand = 1; # always global +ve strand
-    my $primer_finder = $self->get_new_primer_finder($work_dir, $crispr_pair, $strand);
+    my $primer_finder = $self->get_new_primer_finder($work_dir, $crispr_single_or_pair, $strand);
 
     my ( $primer_data, $seq ) = $primer_finder->find_primers;
 
     unless ( $primer_data ) {
-        $self->log->error( 'FAIL: Unable to generate primer pair for crispr pair' );
+        $self->log->error( 'FAIL: Unable to generate primer pair for crispr' );
         return;
     }
 
     $self->log->info( 'SUCCESS: Found primers for target' );
     DumpFile( $work_dir->file('primers.yaml'), $primer_data );
 
-    ## FIXME: check if this will work with crispr pair
+    ## FIXME: check if this will work with crispr single or pair
     if ( $self->persist_primers ) {
         $self->model->txn_do(
             sub {
-                $self->persist_crispr_primer_data( $primer_data, $crispr_pair );
+                $self->persist_crispr_primer_data( $primer_data, $crispr_single_or_pair );
             }
         );
     }
@@ -334,7 +335,7 @@ sub find_internal_primer {
     my $expand_size = int( ( $max_search_region_size - $initial_region_size ) / $retry_attempts );
 
     my %primer_params = (
-        species                     => $crispr_group->species,
+        species                     => $crispr_group->species_id,
         strand                      => 1,
         chromosome                  => $crispr_group->chr_name,
         target_start                => $start_left_crispr->current_locus->chr_start,
