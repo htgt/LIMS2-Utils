@@ -39,6 +39,8 @@ my %PRIMER_PROJECT_CONFIG_FILES = (
             || '/opt/t87/global/conf/primers/short_arm_vector_genotyping.yaml',
     crispr_single_or_pair => $ENV{CRISPR_PAIR_GENOTYPING_PRIMER_CONFIG}
             || '/nfs/users/nfs_a/af11/LIMS2-tmp/crispr_pair_primer_conf.yaml',
+    design_genotyping => $ENV{DESIGN_GENOTYPING_PRIMER_CONFIG}
+            || '/nfs/users/nfs_a/af11/LIMS2-tmp/genotyping_primer_conf.yaml',
 );
 
 has model => (
@@ -108,6 +110,43 @@ has persist_primers => (
     default => 0,
 );
 
+has primer_name_sets => (
+    is      => 'ro',
+    isa     => 'ArrayRef',
+    lazy_build => 1,
+);
+
+# project config file may contain just one set of primers
+# or a list of primers with the names for multiple sets
+# of primers, e.g.
+# primer_names:
+#   -forward: 'GF1'
+#    reverse: 'GR1'
+#
+#   -forward: 'GF2'
+#    reverse: 'GR2'
+#
+# the builder method creates an array even if only one set is provided
+sub _build_primer_name_sets {
+    my $self = shift;
+    my $primer_names = $self->config->{primer_names};
+    my @primer_name_sets;
+    if(ref $self->config->{primer_names} eq ref []){
+        @primer_name_sets = @{ $self->config->{primer_names} };
+    }
+    else{
+        @primer_name_sets = ( $self->config->{primer_names} );
+    }
+
+    my $rank = 0;
+    foreach my $name_set (@primer_name_sets){
+        $name_set->{rank} = $rank;
+        $rank++;
+    }
+
+    return \@primer_name_sets;
+}
+
 # List of field names that we want to output for each primer type
 has primer_output_fields => (
     is      => 'ro',
@@ -147,11 +186,14 @@ sub _build_output_headings {
     my $self = shift;
 
     my @headings;
-    foreach my $type ( qw(forward reverse internal) ){
-        my $primer_name = $self->config->{primer_names}->{$type};
-        next unless $primer_name;
-        foreach my $field_type (@{ $self->primer_output_fields}){
-            push @headings, $primer_name."_".$field_type;
+
+    foreach my $primer_set( @{ $self->primer_name_sets }){
+        TYPE: foreach my $type ( qw(forward reverse internal) ){
+            my $primer_name = $primer_set->{$type};
+            next TYPE unless $primer_name;
+            foreach my $field_type (@{ $self->primer_output_fields}){
+                push @headings, $primer_name."_".$field_type;
+            }
         }
     }
     return \@headings;
@@ -167,15 +209,21 @@ sub _build_output_methods {
     my $self = shift;
     my $methods;
 
-    foreach my $type ( qw(forward reverse internal) ){
-        my $primer_name = $self->config->{primer_names}->{$type};
-        next unless $primer_name;
-        foreach my $field_type (@{ $self->primer_output_fields}){
-            my $field_name = $primer_name."_".$field_type; # e.g. SR1_gc_content
-            $methods->{$field_name} = sub {
-                my $primer = shift->{$type}; # e.g. get the reverse primer for SR1
-                # e.g. apply the gc_content fetcher method to the reverse primer
-                return $self->primer_output_methods->{$field_type}->($primer);
+    foreach my $primer_set( @{ $self->primer_name_sets }){
+        TYPE: foreach my $type ( qw(forward reverse internal) ){
+            my $primer_name = $primer_set->{$type};
+            next TYPE unless $primer_name;
+            foreach my $field_type (@{ $self->primer_output_fields}){
+                my $field_name = $primer_name."_".$field_type; # e.g. SR1_gc_content
+                $methods->{$field_name} = sub {
+                    # e.g. get 0 ranked reverse primer for SR1
+                    my $primer_data = shift;
+                    my $rank = $primer_set->{rank};
+                    my $picked_primers = $primer_data->[$rank] or return undef;
+                    my $primer = $picked_primers->{$type} or return undef;
+                    # e.g. apply the gc_content fetcher method to the reverse primer
+                    return $self->primer_output_methods->{$field_type}->($primer);
+                }
             }
         }
     }
@@ -298,6 +346,68 @@ sub crispr_single_or_pair_genotyping_primers {
         $self->model->txn_do(
             sub {
                 $self->persist_crispr_primer_data( $primer_data, $crispr_single_or_pair );
+            }
+        );
+    }
+
+    return ( $primer_data, $seq );
+}
+
+=head2 design_genotyping_primers
+
+For a Design fetch the design oligos and use min and max oligo positions
+as inputs to generate primers
+
+=cut
+
+sub design_genotyping_primers{
+    my ($self, $design) = @_;
+    $self->log->info( '====================' );
+    $self->log->info( "GENERATE PRIMERS for design_id: " . $design->id );
+
+    my $work_dir = $self->base_dir->subdir( 'design_genotyping_' . $design->id )->absolute;
+    $work_dir->mkpath;
+
+    $self->log->info( 'Searching for Design Genotyping Primers' );
+
+    my @oligos = @{ $design->oligos_sorted || [] };
+
+    my $start_coord = $oligos[0]->{locus}->{chr_start};
+    my $end_coord = $oligos[-1]->{locus}->{chr_end};
+
+    my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new(
+        base_dir                    => $work_dir,
+        species                     => $design->species_id,
+        strand                      => $oligos[0]->{locus}->{chr_strand},
+        chromosome                  => $oligos[0]->{locus}->{chr_name},
+        target_start                => $start_coord,
+        target_end                  => $end_coord,
+        primer3_config_file         => $self->primer3_config_file,
+        five_prime_region_size      => $self->config->{five_prime_region_size},
+        five_prime_region_offset    => $self->config->{five_prime_region_offset},
+        three_prime_region_size     => $self->config->{three_prime_region_size},
+        three_prime_region_offset   => $self->config->{three_prime_region_offset},
+        primer_search_region_expand => $self->config->{primer_search_region_expand},
+        check_genomic_specificity   => ($self->config->{check_genomic_specificity} // 1),
+        product_contains_region_offsets => ($self->config->{product_contains_region_offsets} // 0),
+        retry_attempts => 1,
+    );
+
+    my ( $primer_data, $seq ) = $primer_finder->find_primers;
+
+    unless ( $primer_data ) {
+        $self->log->error( 'FAIL: Unable to generate genotyping primers for design' );
+        return;
+    }
+
+    $self->log->info( 'SUCCESS: Found primers for target' );
+    DumpFile( $work_dir->file('primers.yaml'), $primer_data );
+
+    ## FIXME: check if this will work with design
+    if ( $self->persist_primers ) {
+        $self->model->txn_do(
+            sub {
+                $self->persist_design_primer_data( $primer_data, $design );
             }
         );
     }
@@ -432,13 +542,16 @@ sub get_output_headings {
 =head2 get_output_values
 
    return hash ref of values for the fields in the output_headings array
-   requires one of the primer set hashrefs from primer_data array as input
+   requires a primer_data arrayref as input
 
 =cut
 
 sub get_output_values{
     my ($self, $primer_data) = @_;
     my $values;
+
+    die "No primer data provided to get_output_values" unless $primer_data;
+    $self->log->info("primer data for output: ",Dumper($primer_data));
 
     while ( my($field_name, $method) = each %{ $self->output_methods }){
         $values->{$field_name} = $method->($primer_data);
