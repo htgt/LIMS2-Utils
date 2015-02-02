@@ -41,6 +41,8 @@ my %PRIMER_PROJECT_CONFIG_FILES = (
             || '/nfs/users/nfs_a/af11/LIMS2-tmp/crispr_pair_primer_conf.yaml',
     design_genotyping => $ENV{DESIGN_GENOTYPING_PRIMER_CONFIG}
             || '/nfs/users/nfs_a/af11/LIMS2-tmp/genotyping_primer_conf.yaml',
+    crispr_pcr => $ENV{CRISPR_PCR_PRIMER_CONFIG}
+            || '/nfs/users/nfs_a/af11/LIMS2-tmp/crispr_pcr_primer_conf.yaml',
 );
 
 has model => (
@@ -240,7 +242,24 @@ input:
 
 =cut
 
-sub get_new_primer_finder {
+sub primer_params_from_config {
+    my $self = shift;
+    ## FIXME: am hardcoding retry attempts and no_repeat_masking for testing ##
+    my $params = {
+        primer3_config_file         => $self->primer3_config_file,
+        five_prime_region_size      => $self->config->{five_prime_region_size},
+        five_prime_region_offset    => $self->config->{five_prime_region_offset},
+        three_prime_region_size     => $self->config->{three_prime_region_size},
+        three_prime_region_offset   => $self->config->{three_prime_region_offset},
+        primer_search_region_expand => $self->config->{primer_search_region_expand},
+        check_genomic_specificity   => ($self->config->{check_genomic_specificity} // 1),
+        product_contains_region_offsets => ($self->config->{product_contains_region_offsets} // 0),
+        retry_attempts => 1,
+        no_repeat_masking => 1,
+    };
+    return $params;
+}
+sub get_new_crispr_primer_finder {
     my ($self, $work_dir, $crispr_collection, $strand) = @_;
 $self->log->info("target start on chr: ".$crispr_collection->start);
 $self->log->info("target end on chr: ".$crispr_collection->end);
@@ -252,15 +271,7 @@ $self->log->info("target region length: ".($crispr_collection->end - $crispr_col
         chromosome                  => $crispr_collection->chr_name,
         target_start                => $crispr_collection->start,
         target_end                  => $crispr_collection->end,
-        primer3_config_file         => $self->primer3_config_file,
-        five_prime_region_size      => $self->config->{five_prime_region_size},
-        five_prime_region_offset    => $self->config->{five_prime_region_offset},
-        three_prime_region_size     => $self->config->{three_prime_region_size},
-        three_prime_region_offset   => $self->config->{three_prime_region_offset},
-        primer_search_region_expand => $self->config->{primer_search_region_expand},
-        check_genomic_specificity   => ($self->config->{check_genomic_specificity} // 1),
-        product_contains_region_offsets => ($self->config->{product_contains_region_offsets} // 0),
-        retry_attempts => 1,
+        %{ $self->primer_params_from_config }
     );
 
     return $primer_finder;
@@ -281,7 +292,7 @@ sub crispr_group_genotyping_primers {
 
     $self->log->info( 'Searching for External Primers' );
     my $strand = 1; # always global +ve strand
-    my $primer_finder = $self->get_new_primer_finder($work_dir, $crispr_group, $strand);
+    my $primer_finder = $self->get_new_crispr_primer_finder($work_dir, $crispr_group, $strand);
 
     my ( $primer_data, $seq ) = $primer_finder->find_primers;
 
@@ -329,7 +340,7 @@ sub crispr_single_or_pair_genotyping_primers {
 
     $self->log->info( 'Searching for Primers' );
     my $strand = 1; # always global +ve strand
-    my $primer_finder = $self->get_new_primer_finder($work_dir, $crispr_single_or_pair, $strand);
+    my $primer_finder = $self->get_new_crispr_primer_finder($work_dir, $crispr_single_or_pair, $strand);
 
     my ( $primer_data, $seq ) = $primer_finder->find_primers;
 
@@ -382,15 +393,7 @@ sub design_genotyping_primers{
         chromosome                  => $oligos[0]->{locus}->{chr_name},
         target_start                => $start_coord,
         target_end                  => $end_coord,
-        primer3_config_file         => $self->primer3_config_file,
-        five_prime_region_size      => $self->config->{five_prime_region_size},
-        five_prime_region_offset    => $self->config->{five_prime_region_offset},
-        three_prime_region_size     => $self->config->{three_prime_region_size},
-        three_prime_region_offset   => $self->config->{three_prime_region_offset},
-        primer_search_region_expand => $self->config->{primer_search_region_expand},
-        check_genomic_specificity   => ($self->config->{check_genomic_specificity} // 1),
-        product_contains_region_offsets => ($self->config->{product_contains_region_offsets} // 0),
-        retry_attempts => 1,
+        %{ $self->primer_params_from_config }
     );
 
     my ( $primer_data, $seq ) = $primer_finder->find_primers;
@@ -408,6 +411,62 @@ sub design_genotyping_primers{
         $self->model->txn_do(
             sub {
                 $self->persist_design_primer_data( $primer_data, $design );
+            }
+        );
+    }
+
+    return ( $primer_data, $seq );
+}
+
+=head2 crispr_PCR_primers
+
+For a set of crispr primers use the oligo start and end positions of the 0 ranked primer pair
+as inputs to generate primers
+
+=cut
+
+sub crispr_PCR_primers{
+    my ($self, $crispr_primers, $design, $well_id) = @_;
+    $self->log->info( '====================' );
+    $self->log->info( "GENERATE PCR PRIMERS for crispr primers in well $well_id" );
+
+    my $work_dir = $self->base_dir->subdir( 'crispr_PCR_' . $well_id )->absolute;
+    $work_dir->mkpath;
+
+    $self->log->info( 'Searching for Crispr PCR Primers' );
+
+    my $oligos = $design->oligos_sorted;
+
+    my $target_start = $crispr_primers->[0]->{forward}->{oligo_start} + 1;
+    my $target_end =  $crispr_primers->[0]->{reverse}->{oligo_end} + 1;
+    $self->log->info("PCR Target start: $target_start");
+    $self->log->info("PCR Target end: $target_end");
+
+    my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new(
+        base_dir                    => $work_dir,
+        species                     => $design->species_id,
+        strand                      => $oligos->[0]->{locus}->{chr_strand},
+        chromosome                  => $oligos->[0]->{locus}->{chr_name},
+        target_start                => $target_start,
+        target_end                  => $target_end,
+        %{ $self->primer_params_from_config }
+    );
+
+    my ( $primer_data, $seq ) = $primer_finder->find_primers;
+
+    unless ( $primer_data ) {
+        $self->log->error( 'FAIL: Unable to generate crispr PCR primers for well' );
+        return;
+    }
+
+    $self->log->info( 'SUCCESS: Found primers for target' );
+    DumpFile( $work_dir->file('primers.yaml'), $primer_data );
+
+    ## FIXME: check if this will work with pcr primers
+    if ( $self->persist_primers ) {
+        $self->model->txn_do(
+            sub {
+                $self->persist_pcr_primer_data( $primer_data, $well_id );
             }
         );
     }
