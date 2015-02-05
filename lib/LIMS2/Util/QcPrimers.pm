@@ -112,6 +112,21 @@ has persist_primers => (
     default => 0,
 );
 
+# Set this to true to replace primers already in the database
+has overwrite => (
+    is      => 'ro',
+    isa     => 'Bool',
+    default => 0,
+);
+
+# Set this to true to check if a primer sequence has previously
+# been rejected by user before persisting it to database
+has check_for_rejection => (
+    is      => 'ro',
+    isa     => 'Bool',
+    default => 0,
+);
+
 has primer_name_sets => (
     is      => 'ro',
     isa     => 'ArrayRef',
@@ -254,8 +269,8 @@ sub primer_params_from_config {
         primer_search_region_expand => $self->config->{primer_search_region_expand},
         check_genomic_specificity   => ($self->config->{check_genomic_specificity} // 1),
         product_contains_region_offsets => ($self->config->{product_contains_region_offsets} // 0),
-        retry_attempts => 1,
-        no_repeat_masking => 1,
+        retry_attempts => 3,
+        no_repeat_masking           => ($self->config->{no_repeat_masking} // 1),
     };
     return $params;
 }
@@ -322,7 +337,7 @@ sub crispr_group_genotyping_primers {
         );
     }
 
-    return ( $picked_primers, $seq );
+    return ( [ $picked_primers ], $seq );
 }
 
 =head2 crispr_pair_genotyping_primers
@@ -426,11 +441,11 @@ as inputs to generate primers
 =cut
 
 sub crispr_PCR_primers{
-    my ($self, $crispr_primers, $design, $well_id) = @_;
+    my ($self, $crispr_primers, $design, $crispr) = @_;
     $self->log->info( '====================' );
-    $self->log->info( "GENERATE PCR PRIMERS for crispr primers in well $well_id" );
+    $self->log->info( "GENERATE PCR PRIMERS for".$crispr->id_column_name.": ".$crispr->id );
 
-    my $work_dir = $self->base_dir->subdir( 'crispr_PCR_' . $well_id )->absolute;
+    my $work_dir = $self->base_dir->subdir( 'crispr_PCR_' . $crispr->id )->absolute;
     $work_dir->mkpath;
 
     $self->log->info( 'Searching for Crispr PCR Primers' );
@@ -466,7 +481,7 @@ sub crispr_PCR_primers{
     if ( $self->persist_primers ) {
         $self->model->txn_do(
             sub {
-                $self->persist_pcr_primer_data( $primer_data, $well_id );
+                $self->persist_crispr_primer_data( $primer_data, $crispr );
             }
         );
     }
@@ -518,8 +533,8 @@ sub find_internal_primer {
         primer_search_region_expand => $expand_size,
         retry_attempts              => $retry_attempts,
         internal_only               => 1,
+        no_repeat_masking           => ( $self->config->{internal_primer_no_repeat_masking} // 1 )
     );
-
 
     my $count = 1;
     for my $primers ( @{ $primer_data } ) {
@@ -556,33 +571,50 @@ Persist the primers generated for a crispr group.
 
 =cut
 sub persist_crispr_primer_data {
-    my ( $self, $picked_primers, $crispr_group ) = @_;
-    $self->log->info( 'Persisting crispr group primers' );
+    my ( $self, $generated_primers, $crispr_collection ) = @_;
+    $self->log->info( 'Persisting crispr primers' );
 
-    my $chr_name = $crispr_group->chr_name;
-    my $species = $crispr_group->right_most_crispr->species;
-    my $assembly_id = $species->default_assembly->assembly_id;
+    # $generated_primers should be a ref to a ranked array of primer sets
+    # For backwards compatability we put a single set of generated primers
+    # into an array
+    unless(ref $generated_primers eq ref []){
+        $generated_primers = [ $generated_primers ];
+    }
 
-    for my $type ( qw( forward reverse internal ) ) {
-        next unless exists $picked_primers->{$type};
-        my $data = $picked_primers->{$type};
+    my $chr_name = $crispr_collection->chr_name;
+    my $assembly_id = $crispr_collection->default_assembly->assembly_id;
+    my $id_column_name = $crispr_collection->id_column_name;
 
-        $self->model->create_crispr_primer(
-            {
-                crispr_group_id => $crispr_group->id,
-                primer_name     => $self->config->{primer_names}{$type},
-                primer_seq      => uc( $data->{oligo_seq} ),
-                tm              => $data->{melting_temp},
-                gc_content      => $data->{gc_content},
-                locus => {
-                    assembly   => $assembly_id,
-                    chr_name   => $chr_name,
-                    chr_start  => $data->{oligo_start},
-                    chr_end    => $data->{oligo_end},
-                    chr_strand => $type eq 'forward' ? 1 : -1,
-                },
-            }
-        );
+    my $rank = 0;
+    foreach my $primer_set (@{ $self->primer_name_sets }){
+        my $picked_primers = $generated_primers->[$rank];
+        last unless $picked_primers;
+        $rank++;
+        for my $type ( qw( forward reverse internal ) ) {
+            next unless exists $picked_primers->{$type};
+            my $data = $picked_primers->{$type};
+
+            # FIXME: this should run in a txn and errors caught
+            # and logged for each primer
+            $self->model->create_crispr_primer(
+                {
+                    $id_column_name => $crispr_collection->id,
+                    primer_name     => $primer_set->{$type},
+                    primer_seq      => uc( $data->{oligo_seq} ),
+                    tm              => $data->{melting_temp},
+                    gc_content      => $data->{gc_content},
+                    locus => {
+                        assembly   => $assembly_id,
+                        chr_name   => $chr_name,
+                        chr_start  => $data->{oligo_start},
+                        chr_end    => $data->{oligo_end},
+                        chr_strand => $type eq 'forward' ? 1 : -1,
+                    },
+                    overwrite => 1,
+                    check_for_rejection => 1,
+                }
+            );
+        }
     }
 
     return;
