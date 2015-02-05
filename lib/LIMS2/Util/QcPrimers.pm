@@ -425,7 +425,7 @@ sub design_genotyping_primers{
     if ( $self->persist_primers ) {
         $self->model->txn_do(
             sub {
-                $self->persist_design_primer_data( $primer_data, $design );
+                $self->persist_genotyping_primer_data( $primer_data, $design );
             }
         );
     }
@@ -567,23 +567,60 @@ sub find_internal_primer {
 
 =head2 persist_crispr_primer_data
 
-Persist the primers generated for a crispr group.
+Persist the primers generated for a crispr, pair or group.
 
 =cut
 sub persist_crispr_primer_data {
     my ( $self, $generated_primers, $crispr_collection ) = @_;
     $self->log->info( 'Persisting crispr primers' );
 
+    $self->_persist_primer_data({
+        primers        => $generated_primers,
+        create_method  => 'create_crispr_primer',
+        id_column_name => $crispr_collection->id_column_name,
+        id             => $crispr_collection->id,
+        assembly_id    => $crispr_collection->default_assembly->assembly_id,
+        chr_name       => $crispr_collection->chr_name,
+    });
+
+    return;
+}
+
+=head2 persist_genotyping_primer_data
+
+Persist the primers generated for a design.
+
+=cut
+sub persist_genotyping_primer_data {
+    my ( $self, $generated_primers, $design ) = @_;
+    $self->log->info( 'Persisting design genotyping primers' );
+
+    my $assembly_id = $design->species->default_assembly->assembly_id;
+
+    $self->_persist_primer_data({
+        primers        => $generated_primers,
+        create_method  => 'create_genotyping_primer',
+        id_column_name => 'design_id',
+        id             => $design->id,
+        assembly_id    => $assembly_id,
+        chr_name       => $design->chr_name,
+    });
+
+    return;
+}
+
+sub _persist_primer_data{
+    my ($self, $params) = @_;
+
     # $generated_primers should be a ref to a ranked array of primer sets
     # For backwards compatability we put a single set of generated primers
     # into an array
+    my $generated_primers = $params->{primers};
+    my $create_method = $params->{create_method};
+
     unless(ref $generated_primers eq ref []){
         $generated_primers = [ $generated_primers ];
     }
-
-    my $chr_name = $crispr_collection->chr_name;
-    my $assembly_id = $crispr_collection->default_assembly->assembly_id;
-    my $id_column_name = $crispr_collection->id_column_name;
 
     my $rank = 0;
     foreach my $primer_set (@{ $self->primer_name_sets }){
@@ -596,30 +633,31 @@ sub persist_crispr_primer_data {
 
             # FIXME: this should run in a txn and errors caught
             # and logged for each primer
-            $self->model->create_crispr_primer(
+            $self->model->$create_method(
                 {
-                    $id_column_name => $crispr_collection->id,
+                    $params->{id_column_name} => $params->{id},
                     primer_name     => $primer_set->{$type},
                     primer_seq      => uc( $data->{oligo_seq} ),
                     tm              => $data->{melting_temp},
                     gc_content      => $data->{gc_content},
                     locus => {
-                        assembly   => $assembly_id,
-                        chr_name   => $chr_name,
+                        assembly   => $params->{assembly_id},
+                        chr_name   => $params->{chr_name},
                         chr_start  => $data->{oligo_start},
                         chr_end    => $data->{oligo_end},
                         chr_strand => $type eq 'forward' ? 1 : -1,
                     },
-                    overwrite => 1,
-                    check_for_rejection => 1,
+                    overwrite      => $self->overwrite,
+                    check_for_rejection => $self->check_for_rejection,
                 }
             );
         }
     }
 
     return;
-}
 
+
+}
 =head2 get_output_headings
 
     return array ref of field names to use as column headings in output
