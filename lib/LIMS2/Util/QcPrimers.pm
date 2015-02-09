@@ -43,6 +43,7 @@ my %PRIMER_PROJECT_CONFIG_FILES = (
             || '/nfs/users/nfs_a/af11/LIMS2-tmp/genotyping_primer_conf.yaml',
     crispr_pcr => $ENV{CRISPR_PCR_PRIMER_CONFIG}
             || '/nfs/users/nfs_a/af11/LIMS2-tmp/crispr_pcr_primer_conf.yaml',
+    nonsense_crispr_trial => '/nfs/users/nfs_a/af11/LIMS2-tmp/nonsense_crispr_seq_primers.yaml',
 );
 
 has model => (
@@ -168,7 +169,7 @@ sub _build_primer_name_sets {
 has primer_output_fields => (
     is      => 'ro',
     isa     => 'ArrayRef',
-    default => sub{ [qw(seq strand length gc_content tm)] },
+    default => sub{ [qw(seq strand length start end gc_content tm)] },
 );
 
 # Methods to generate these outputs given a single primer's
@@ -188,6 +189,8 @@ sub _build_primer_output_methods {
         length => sub{ shift->{oligo_length} },
         gc_content => sub{ shift->{gc_content} },
         tm         => sub{ shift->{melting_temp} },
+        start  => sub{ shift->{oligo_start} },
+        end    => sub{ shift->{oligo_end} }
     };
 
     return $methods;
@@ -367,7 +370,6 @@ sub crispr_single_or_pair_genotyping_primers {
     $self->log->info( 'SUCCESS: Found primers for target' );
     DumpFile( $work_dir->file('primers.yaml'), $primer_data );
 
-    ## FIXME: check if this will work with crispr single or pair
     if ( $self->persist_primers ) {
         $self->model->txn_do(
             sub {
@@ -441,7 +443,7 @@ as inputs to generate primers
 =cut
 
 sub crispr_PCR_primers{
-    my ($self, $crispr_primers, $design, $crispr) = @_;
+    my ($self, $crispr_primers, $crispr) = @_;
     $self->log->info( '====================' );
     $self->log->info( "GENERATE PCR PRIMERS for".$crispr->id_column_name.": ".$crispr->id );
 
@@ -450,18 +452,18 @@ sub crispr_PCR_primers{
 
     $self->log->info( 'Searching for Crispr PCR Primers' );
 
-    my $oligos = $design->oligos_sorted;
-
     my $target_start = $crispr_primers->[0]->{forward}->{oligo_start} + 1;
     my $target_end =  $crispr_primers->[0]->{reverse}->{oligo_end} + 1;
     $self->log->info("PCR Target start: $target_start");
     $self->log->info("PCR Target end: $target_end");
 
+    my $strand = 1; # FIXME: what should this be???
+
     my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new(
         base_dir                    => $work_dir,
-        species                     => $design->species_id,
-        strand                      => $oligos->[0]->{locus}->{chr_strand},
-        chromosome                  => $oligos->[0]->{locus}->{chr_name},
+        species                     => $crispr->species_id,
+        strand                      => $strand,
+        chromosome                  => $crispr->chr_name,
         target_start                => $target_start,
         target_end                  => $target_end,
         %{ $self->primer_params_from_config }
@@ -477,7 +479,6 @@ sub crispr_PCR_primers{
     $self->log->info( 'SUCCESS: Found primers for target' );
     DumpFile( $work_dir->file('primers.yaml'), $primer_data );
 
-    ## FIXME: check if this will work with pcr primers
     if ( $self->persist_primers ) {
         $self->model->txn_do(
             sub {
