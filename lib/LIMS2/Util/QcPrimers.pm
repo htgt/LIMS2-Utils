@@ -156,6 +156,8 @@ sub _build_primer_name_sets {
         @primer_name_sets = ( $self->config->{primer_names} );
     }
 
+    # I had to store the rank with the name set in order
+    # to use it in _build_output_methods
     my $rank = 0;
     foreach my $name_set (@primer_name_sets){
         $name_set->{rank} = $rank;
@@ -332,15 +334,16 @@ sub crispr_group_genotyping_primers {
     $self->log->info( 'SUCCESS: Found primers for target' );
     DumpFile( $work_dir->file('primers.yaml'), $picked_primers );
 
+    my $db_primers = [];
     if ( $self->persist_primers ) {
         $self->model->txn_do(
             sub {
-                $self->persist_crispr_primer_data( $picked_primers, $crispr_group );
+                $db_primers = $self->persist_crispr_primer_data( $picked_primers, $crispr_group );
             }
         );
     }
 
-    return ( [ $picked_primers ], $seq );
+    return ( [ $picked_primers ], $seq, $db_primers );
 }
 
 =head2 crispr_pair_genotyping_primers
@@ -370,15 +373,16 @@ sub crispr_single_or_pair_genotyping_primers {
     $self->log->info( 'SUCCESS: Found primers for target' );
     DumpFile( $work_dir->file('primers.yaml'), $primer_data );
 
+    my $db_primers = [];
     if ( $self->persist_primers ) {
         $self->model->txn_do(
             sub {
-                $self->persist_crispr_primer_data( $primer_data, $crispr_single_or_pair );
+                $db_primers = $self->persist_crispr_primer_data( $primer_data, $crispr_single_or_pair );
             }
         );
     }
 
-    return ( $primer_data, $seq );
+    return ( $primer_data, $seq, $db_primers );
 }
 
 =head2 design_genotyping_primers
@@ -423,16 +427,16 @@ sub design_genotyping_primers{
     $self->log->info( 'SUCCESS: Found primers for target' );
     DumpFile( $work_dir->file('primers.yaml'), $primer_data );
 
-    ## FIXME: check if this will work with design
+    my $db_primers = [];
     if ( $self->persist_primers ) {
         $self->model->txn_do(
             sub {
-                $self->persist_genotyping_primer_data( $primer_data, $design );
+                $db_primers = $self->persist_genotyping_primer_data( $primer_data, $design );
             }
         );
     }
 
-    return ( $primer_data, $seq );
+    return ( $primer_data, $seq, $db_primers );
 }
 
 =head2 crispr_PCR_primers
@@ -479,15 +483,16 @@ sub crispr_PCR_primers{
     $self->log->info( 'SUCCESS: Found primers for target' );
     DumpFile( $work_dir->file('primers.yaml'), $primer_data );
 
+    my $db_primers = [];
     if ( $self->persist_primers ) {
         $self->model->txn_do(
             sub {
-                $self->persist_crispr_primer_data( $primer_data, $crispr );
+                $db_primers = $self->persist_crispr_primer_data( $primer_data, $crispr );
             }
         );
     }
 
-    return ( $primer_data, $seq );
+    return ( $primer_data, $seq, $db_primers );
 }
 
 =head2 find_internal_primer
@@ -575,7 +580,7 @@ sub persist_crispr_primer_data {
     my ( $self, $generated_primers, $crispr_collection ) = @_;
     $self->log->info( 'Persisting crispr primers' );
 
-    $self->_persist_primer_data({
+    my $db_primers = $self->_persist_primer_data({
         primers        => $generated_primers,
         create_method  => 'create_crispr_primer',
         id_column_name => $crispr_collection->id_column_name,
@@ -584,7 +589,7 @@ sub persist_crispr_primer_data {
         chr_name       => $crispr_collection->chr_name,
     });
 
-    return;
+    return $db_primers;
 }
 
 =head2 persist_genotyping_primer_data
@@ -598,7 +603,7 @@ sub persist_genotyping_primer_data {
 
     my $assembly_id = $design->species->default_assembly->assembly_id;
 
-    $self->_persist_primer_data({
+    my $db_primers = $self->_persist_primer_data({
         primers        => $generated_primers,
         create_method  => 'create_genotyping_primer',
         id_column_name => 'design_id',
@@ -607,7 +612,7 @@ sub persist_genotyping_primer_data {
         chr_name       => $design->chr_name,
     });
 
-    return;
+    return $db_primers;
 }
 
 sub _persist_primer_data{
@@ -623,6 +628,7 @@ sub _persist_primer_data{
         $generated_primers = [ $generated_primers ];
     }
 
+    my @db_primers;
     my $rank = 0;
     foreach my $primer_set (@{ $self->primer_name_sets }){
         my $picked_primers = $generated_primers->[$rank];
@@ -632,9 +638,7 @@ sub _persist_primer_data{
             next unless exists $picked_primers->{$type};
             my $data = $picked_primers->{$type};
 
-            # FIXME: this should run in a txn and errors caught
-            # and logged for each primer
-            $self->model->$create_method(
+            my $primer = $self->model->$create_method(
                 {
                     $params->{id_column_name} => $params->{id},
                     primer_name     => $primer_set->{$type},
@@ -652,13 +656,13 @@ sub _persist_primer_data{
                     check_for_rejection => $self->check_for_rejection,
                 }
             );
+
+            push @db_primers, $primer;
         }
     }
-
-    return;
-
-
+    return \@db_primers;
 }
+
 =head2 get_output_headings
 
     return array ref of field names to use as column headings in output
