@@ -274,6 +274,7 @@ sub primer_params_from_config {
         primer_search_region_expand => $self->config->{primer_search_region_expand},
         check_genomic_specificity   => ($self->config->{check_genomic_specificity} // 1),
         product_contains_region_offsets => ($self->config->{product_contains_region_offsets} // 0),
+        exclude_from_product_length => ($self->config->{exclude_from_product_length} // 0),
         retry_attempts => 3,
         no_repeat_masking           => ($self->config->{no_repeat_masking} // 1),
     };
@@ -407,6 +408,7 @@ sub design_genotyping_primers{
     my $start_coord = $oligos[0]->{locus}->{chr_start};
     my $end_coord = $oligos[-1]->{locus}->{chr_end};
 
+    $self->log->debug('Strand for design '.$design->id.": ".$oligos[0]->{locus}->{chr_strand});
     my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new(
         base_dir                    => $work_dir,
         species                     => $design->species_id,
