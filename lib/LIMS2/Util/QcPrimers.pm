@@ -27,6 +27,7 @@ use Path::Class;
 use Const::Fast;
 use YAML::Any qw( LoadFile DumpFile );
 use Data::Dumper;
+use Bio::Perl qw(reverse_complement_as_string);
 
 use namespace::autoclean;
 
@@ -407,12 +408,13 @@ sub design_genotyping_primers{
 
     my $start_coord = $oligos[0]->{locus}->{chr_start};
     my $end_coord = $oligos[-1]->{locus}->{chr_end};
+    my $strand = $oligos[0]->{locus}->{chr_strand};
 
-    $self->log->debug('Strand for design '.$design->id.": ".$oligos[0]->{locus}->{chr_strand});
+    $self->log->debug('Strand for design '.$design->id.": $strand");
     my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new(
         base_dir                    => $work_dir,
         species                     => $design->species_id,
-        strand                      => $oligos[0]->{locus}->{chr_strand},
+        strand                      => $strand,
         chromosome                  => $oligos[0]->{locus}->{chr_name},
         target_start                => $start_coord,
         target_end                  => $end_coord,
@@ -420,6 +422,25 @@ sub design_genotyping_primers{
     );
 
     my ( $primer_data, $seq ) = $primer_finder->find_primers;
+
+    # For designs with genes on the reverse strand we need to reverse complement the primers
+    # and store them such that the forward primer e.g. GF1, lies on the reverse strand
+    # and the reverse primer, e.g. GR1, lies on the forward strand
+    if($strand == -1){
+        $self->log->debug("Reverse complementing primers for gene on reverse strand");
+        foreach my $primer_group (@$primer_data){
+            foreach my $primer_type (keys %$primer_group){
+                my $orig_seq = $primer_group->{$primer_type}->{oligo_seq};
+                my $orig_direction = $primer_group->{$primer_type}->{oligo_direction};
+
+                my $store_seq = reverse_complement_as_string($orig_seq);
+                my $store_direction = $orig_direction eq 'forward' ? 'reverse' : 'forward';
+
+                $primer_group->{$primer_type}->{oligo_seq} = $store_seq;
+                $primer_group->{$primer_type}->{oligo_direction} = $store_direction;
+            }
+        }
+    }
 
     unless ( $primer_data ) {
         $self->log->error( 'FAIL: Unable to generate genotyping primers for design' );
@@ -640,6 +661,16 @@ sub _persist_primer_data{
             next unless exists $picked_primers->{$type};
             my $data = $picked_primers->{$type};
 
+            my $chr_strand = $type eq 'forward' ? 1 : -1;
+            if(defined $data->{oligo_strand_to_store}){
+                $chr_strand = $data->{oligo_strand_to_store};
+            }
+
+            # Use oligo strand instead of primer type to determine
+            # strandedness in case we have reversed the primer orientation
+            # for design genotyping primers for gene on reverse strand
+            my $strand = $data->{oligo_direction} eq 'forward' ? 1 : -1;
+
             my $primer = $self->model->$create_method(
                 {
                     $params->{id_column_name} => $params->{id},
@@ -652,7 +683,7 @@ sub _persist_primer_data{
                         chr_name   => $params->{chr_name},
                         chr_start  => $data->{oligo_start},
                         chr_end    => $data->{oligo_end},
-                        chr_strand => $type eq 'forward' ? 1 : -1,
+                        chr_strand => $strand,
                     },
                     overwrite      => $self->overwrite,
                     check_for_rejection => $self->check_for_rejection,
