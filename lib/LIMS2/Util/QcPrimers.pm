@@ -274,7 +274,6 @@ sub primer_params_from_config {
         three_prime_region_offset   => $self->config->{three_prime_region_offset},
         primer_search_region_expand => $self->config->{primer_search_region_expand},
         check_genomic_specificity   => ($self->config->{check_genomic_specificity} // 1),
-        product_contains_region_offsets => ($self->config->{product_contains_region_offsets} // 0),
         exclude_from_product_length => ($self->config->{exclude_from_product_length} // 0),
         retry_attempts => 3,
         no_repeat_masking           => ($self->config->{no_repeat_masking} // 1),
