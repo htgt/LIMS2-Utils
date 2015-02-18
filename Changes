@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.056     2015-02-18 12:13:12 Europe/London
+
+    generate_fp_report_cache modified to default for full report
+
 0.059     2015-01-21 16:33:02 Europe/London
 
    trying at the cached fp reports to localy fiz the multiple slashes when on staging, again
