@@ -1,4 +1,10 @@
 package LIMS2::Util::Errbit;
+## no critic(RequireUseStrict,RequireUseWarnings)
+{
+    $LIMS2::Util::Errbit::VERSION = '0.056';
+}
+## use critic
+
 
 use strict;
 use warnings;
