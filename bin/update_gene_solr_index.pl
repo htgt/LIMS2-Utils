@@ -75,6 +75,7 @@ INFO "LIMS2 gene solr index update: Process completed at : $end_time";
 
 
 # xml creation
+## no critic(ProhibitComplexRegexes)
 sub build_list {
 
     my $model = LIMS2::Model->new( user => 'lims2' );
@@ -132,7 +133,7 @@ END
 
     return;
 }
-
+## use critic
 
 
 
