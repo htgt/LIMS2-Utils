@@ -1,3 +1,7 @@
+0.061     2015-02-19 16:43:45 Europe/London
+
+    update_gene_solr_index script updated to include chromosome, crispr data removed
+
 0.060     2015-02-18 13:18:05 Europe/London
 
     generate_fp_report_cache modified to default for full report

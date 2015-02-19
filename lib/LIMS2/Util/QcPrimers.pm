@@ -1,7 +1,7 @@
 package LIMS2::Util::QcPrimers;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::QcPrimers::VERSION = '0.060';
+    $LIMS2::Util::QcPrimers::VERSION = '0.061';
 }
 ## use critic
 
