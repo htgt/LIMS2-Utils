@@ -74,8 +74,6 @@ INFO "LIMS2 gene solr index update: Start time was       : $start_time";
 INFO "LIMS2 gene solr index update: Process completed at : $end_time";
 
 
-
-
 # xml creation
 sub build_list {
 
