@@ -96,7 +96,11 @@ sub build_design_data {
     }
 
     # delete unwanted information
-    delete( $_->{id} ) for @{ $design_data->{genotyping_primers} };
+    for my $gp ( @{ $design_data->{genotyping_primers} } ) {
+        delete $gp->{id};
+        delete $gp->{locus};
+        delete $gp->{species};
+    }
     delete( $design_data->{assigned_genes} );
     delete( $design_data->{oligos_fasta} );
     delete( $_->{id} ) for @{ $design_data->{comments} };
