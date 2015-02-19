@@ -114,6 +114,13 @@ has persist_primers => (
     default => 0,
 );
 
+# Set to true to run bwa genomic specificity checks on farm
+has farm_bwa => (
+    is       => 'ro',
+    isa      => 'Bool',
+    default  => 0,
+);
+
 # Set this to true to replace primers already in the database
 has overwrite => (
     is      => 'ro',
@@ -275,8 +282,8 @@ sub primer_params_from_config {
         primer_search_region_expand => $self->config->{primer_search_region_expand},
         check_genomic_specificity   => ($self->config->{check_genomic_specificity} // 1),
         exclude_from_product_length => ($self->config->{exclude_from_product_length} // 0),
-        retry_attempts => 3,
         no_repeat_masking           => ($self->config->{no_repeat_masking} // 1),
+        farm_bwa                    => $self->farm_bwa,
     };
     return $params;
 }
