@@ -24,7 +24,7 @@ my $human_file = '/tmp/hgnc_list.txt';
 # get list of HGNC approved symbols and save it on the new file
 INFO "Getting list of HGNC genes...\n";
 open my $HGNC, '>', "$human_file" or die $!;
-my $page = get('http://www.genenames.org/cgi-bin/download?col=gd_hgnc_id&col=gd_app_sym&col=gd_app_name&col=md_ensembl_id&status=Approved&status_opt=2&where=%28%28gd_pub_chrom_map%20not%20like%20%27%25patch%25%27%20and%20gd_pub_chrom_map%20not%20like%20%27%25alternate%20reference%20locus%25%27%29%20or%20gd_pub_chrom_map%20IS%20NULL%29&order_by=gd_hgnc_id&format=text&limit=&hgnc_dbtag=on&submit=submit')
+my $page = get('http://www.genenames.org/cgi-bin/download?col=gd_hgnc_id&col=gd_app_sym&col=gd_app_name&col=gd_pub_chrom_map&col=md_ensembl_id&status=Approved&status_opt=2&where=&order_by=gd_app_sym_sort&format=text&limit=&hgnc_dbtag=on&submit=submit')
 or die ERROR "Could not get list of HGNC genes.\n";
 print $HGNC $page;
 close $HGNC;
@@ -32,7 +32,7 @@ close $HGNC;
 
 # Mouse data
 my $mouse_file = '/tmp/mgi_list.txt';
-my $mouse_location = 'ftp://ftp.informatics.jax.org/pub/reports/MRK_ENSEMBL.rpt';
+my $mouse_location = 'ftp://ftp.informatics.jax.org/pub/reports/MGI_AllGenes.rpt';
 
 
 
@@ -88,19 +88,15 @@ sub build_list {
         distinct       => 1
     });
 
-
-    # open my $GENE_LIST, '>' ,"$update_file" or die $!;
     print $GENE_LIST "<add>\n";
 
     my @gene_list = map {$_->gene_id} @rows;
 
-
-    # open my $HUMAN_FILE, '<', $human_file or die $!;
     while (<$HUMAN_FILE>) {
         chomp;
         my $species = 'Human';
-        if (/(HGNC:\d*)\t([^\t]*)\t([^\t]*)\t([^\t]*)/) {
-            my ($id, $symbol, $ensembl, $name) = ($1, $2, $4, encode_entities($3) );
+        if (/(HGNC:\d*)\t([^\t]*)\t([^\t]*)\t([^qp]*)[^\t]*\t([^\t]*)/) {
+            my ($id, $symbol, $ensembl, $name, $chromosome) = ($1, $2, $5, encode_entities($3), $4 );
 
             print $GENE_LIST <<"END";
   <doc>
@@ -108,47 +104,18 @@ sub build_list {
     <field name=\"symbol\">$symbol</field>
     <field name=\"ensembl_id\">$ensembl</field>
     <field name=\"species\">$species</field>
-END
-
-            if ( first { $_ eq $id } @gene_list ) {
-
-                # get the gibson design count
-                my $report_params = {
-                    type => 'simple',
-                    off_target_algorithm => 'bwa',
-                    crispr_types => 'pair'
-                };
-
-                my $build = $DEFAULT_SPECIES_BUILD{ lc($species) };
-
-                my ( $designs ) = design_target_report_for_genes( $model->schema, $id, $species, $build, $report_params );
-
-                my $design_count = sum map { $_->{ 'designs' } } @{$designs};
-                if (!defined $design_count) {$design_count = 0};
-                my $crispr_pairs_count = sum map { $_->{ 'crispr_pairs' } } @{$designs};
-                if (!defined $crispr_pairs_count) {$crispr_pairs_count = 0};
-
-                print $GENE_LIST <<"END";
-    <field name=\"design_count\">$design_count</field>
-    <field name=\"crispr_pairs_count\">$crispr_pairs_count</field>
-END
-            }
-
-            print $GENE_LIST <<"END";
+    <field name=\"chromosome\">$chromosome</field>
   </doc>
 END
 
         }
     }
-    # close $HUMAN_FILE;
 
-
-    # open my $MOUSE_FILE, '<', $mouse_file or die $!;
     while (<$MOUSE_FILE>) {
         chomp;
         my $species = 'Mouse';
-        if (/(MGI:\d*)\t([^\t]*)\t([^\t]*)\t[^\t]*\t[^\t]*\t([^\t]*)/) {
-            my ($id, $symbol, $ensembl, $name) = ($1, $2, $4, encode_entities($3) );
+        if (/(MGI:\d*)\t([^\t]*)\t([^\t]*)\t[^\t]*\t[^\t]*\t[^\t]*\t[^\t]*\t([^\t]*)\t[^\t]*\t[^\t]*\t[^\t]*\t[^\t]*\t([^\t]*)/) {
+            my ($id, $symbol, $ensembl, $name, $chromosome) = ($1, $2, $5, encode_entities($3), $4 );
 
             print $GENE_LIST <<"END";
   <doc>
@@ -156,43 +123,14 @@ END
     <field name=\"symbol\">$symbol</field>
     <field name=\"ensembl_id\">$ensembl</field>
     <field name=\"species\">$species</field>
-END
-
-            if ( first { $_ eq $id } @gene_list ) {
-
-                # get the gibson design count
-                my $report_params = {
-                    type => 'simple',
-                    off_target_algorithm => 'bwa',
-                    crispr_types => 'pair'
-                };
-
-                my $build = $DEFAULT_SPECIES_BUILD{ lc($species) };
-
-                my ( $designs ) = design_target_report_for_genes( $model->schema, $id, $species, $build, $report_params );
-
-                my $design_count = sum map { $_->{ 'designs' } } @{$designs};
-                if (!defined $design_count) {$design_count = 0};
-                my $crispr_pairs_count = sum map { $_->{ 'crispr_pairs' } } @{$designs};
-                if (!defined $crispr_pairs_count) {$crispr_pairs_count = 0};
-
-                print $GENE_LIST <<"END";
-    <field name=\"design_count\">$design_count</field>
-    <field name=\"crispr_pairs_count\">$crispr_pairs_count</field>
-END
-            }
-
-            print $GENE_LIST <<"END";
+    <field name=\"chromosome\">$chromosome</field>
   </doc>
 END
 
         }
     }
-    # close $MOUSE_FILE;
-
 
     print $GENE_LIST "</add>\n";
-    # close $GENE_LIST;
 
     return;
 }
