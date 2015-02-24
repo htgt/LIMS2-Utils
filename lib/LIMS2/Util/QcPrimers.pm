@@ -28,6 +28,10 @@ use Const::Fast;
 use YAML::Any qw( LoadFile DumpFile );
 use Data::Dumper;
 use Bio::Perl qw(reverse_complement_as_string);
+use Bio::Seq;
+use WebAppCommon::Util::FarmJobRunner;
+use Path::Class;
+use JSON;
 
 use namespace::autoclean;
 
@@ -38,13 +42,12 @@ my %PRIMER_PROJECT_CONFIG_FILES = (
             || '/opt/t87/global/conf/primers/mgp_recovery_genotyping.yaml',
     short_arm_vectors => $ENV{SHORT_ARM_VECTOR_GENOTYPING_PRIMER_CONFIG}
             || '/opt/t87/global/conf/primers/short_arm_vector_genotyping.yaml',
-    crispr_single_or_pair => $ENV{CRISPR_PAIR_GENOTYPING_PRIMER_CONFIG}
-            || '/nfs/users/nfs_a/af11/LIMS2-tmp/crispr_pair_primer_conf.yaml',
+    crispr_single_or_pair => $ENV{CRISPR_GENOTYPING_PRIMER_CONFIG}
+            || '/opt/t87/global/conf/primers/crispr_genotyping_primer_conf.yaml',
     design_genotyping => $ENV{DESIGN_GENOTYPING_PRIMER_CONFIG}
-            || '/nfs/users/nfs_a/af11/LIMS2-tmp/genotyping_primer_conf.yaml',
+            || '/opt/t87/global/conf/primers/design_genotyping_primer_conf.yaml',
     crispr_pcr => $ENV{CRISPR_PCR_PRIMER_CONFIG}
-            || '/nfs/users/nfs_a/af11/LIMS2-tmp/crispr_pcr_primer_conf.yaml',
-    nonsense_crispr_trial => '/nfs/users/nfs_a/af11/LIMS2-tmp/nonsense_crispr_seq_primers.yaml',
+            || '/opt/t87/global/conf/primers/crispr_pcr_primer_conf.yaml',
 );
 
 has model => (
@@ -114,8 +117,8 @@ has persist_primers => (
     default => 0,
 );
 
-# Set to true to run bwa genomic specificity checks on farm
-has farm_bwa => (
+# Set to true to run primer generation on farm
+has run_on_farm => (
     is       => 'ro',
     isa      => 'Bool',
     default  => 0,
@@ -272,7 +275,7 @@ input:
 
 sub primer_params_from_config {
     my $self = shift;
-    ## FIXME: am hardcoding retry attempts and no_repeat_masking for testing ##
+
     my $params = {
         primer3_config_file         => $self->primer3_config_file,
         five_prime_region_size      => $self->config->{five_prime_region_size},
@@ -283,16 +286,14 @@ sub primer_params_from_config {
         check_genomic_specificity   => ($self->config->{check_genomic_specificity} // 1),
         exclude_from_product_length => ($self->config->{exclude_from_product_length} // 0),
         no_repeat_masking           => ($self->config->{no_repeat_masking} // 1),
-        farm_bwa                    => $self->farm_bwa,
     };
     return $params;
 }
-sub get_new_crispr_primer_finder {
+
+sub get_new_crispr_primer_finder_params {
     my ($self, $work_dir, $crispr_collection, $strand) = @_;
-$self->log->info("target start on chr: ".$crispr_collection->start);
-$self->log->info("target end on chr: ".$crispr_collection->end);
-$self->log->info("target region length: ".($crispr_collection->end - $crispr_collection->start));
-    my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new(
+
+    return {
         base_dir                    => $work_dir,
         species                     => $crispr_collection->species_id,
         strand                      => $strand,
@@ -300,9 +301,7 @@ $self->log->info("target region length: ".($crispr_collection->end - $crispr_col
         target_start                => $crispr_collection->start,
         target_end                  => $crispr_collection->end,
         %{ $self->primer_params_from_config }
-    );
-
-    return $primer_finder;
+    };
 }
 
 =head2 crispr_group_genotyping_primers
@@ -320,9 +319,9 @@ sub crispr_group_genotyping_primers {
 
     $self->log->info( 'Searching for External Primers' );
     my $strand = 1; # always global +ve strand
-    my $primer_finder = $self->get_new_crispr_primer_finder($work_dir, $crispr_group, $strand);
+    my $params = $self->get_new_crispr_primer_finder_params($work_dir, $crispr_group, $strand);
 
-    my ( $primer_data, $seq ) = $primer_finder->find_primers;
+    my ( $primer_data, $seq, $five_prime_region_size) = $self->run_generate_primers_attempts($params);
 
     unless ( $primer_data ) {
         $self->log->error( 'FAIL: Unable to generate primer pair for crispr group' );
@@ -332,7 +331,7 @@ sub crispr_group_genotyping_primers {
     $self->log->info( 'Found External Primers' );
     $self->log->info( 'Searching for Internal Primer' );
     my $picked_primers = $self->find_internal_primer( $crispr_group, $work_dir, $primer_data,
-        $primer_finder->five_prime_region_size );
+        $five_prime_region_size );
 
     unless( $picked_primers ) {
         $self->log->error( 'FAIL: Unable to find internal primer for crispr group' );
@@ -369,9 +368,9 @@ sub crispr_single_or_pair_genotyping_primers {
 
     $self->log->info( 'Searching for Primers' );
     my $strand = 1; # always global +ve strand
-    my $primer_finder = $self->get_new_crispr_primer_finder($work_dir, $crispr_single_or_pair, $strand);
+    my $params = $self->get_new_crispr_primer_finder_params($work_dir, $crispr_single_or_pair, $strand);
 
-    my ( $primer_data, $seq ) = $primer_finder->find_primers;
+    my ( $primer_data, $seq ) = $self->run_generate_primers_attempts($params);
 
     unless ( $primer_data ) {
         $self->log->error( 'FAIL: Unable to generate primer pair for crispr' );
@@ -417,7 +416,7 @@ sub design_genotyping_primers{
     my $strand = $oligos[0]->{locus}->{chr_strand};
 
     $self->log->debug('Strand for design '.$design->id.": $strand");
-    my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new(
+    my $params = {
         base_dir                    => $work_dir,
         species                     => $design->species_id,
         strand                      => $strand,
@@ -425,9 +424,9 @@ sub design_genotyping_primers{
         target_start                => $start_coord,
         target_end                  => $end_coord,
         %{ $self->primer_params_from_config }
-    );
+    };
 
-    my ( $primer_data, $seq ) = $primer_finder->find_primers;
+    my ( $primer_data, $seq ) = $self->run_generate_primers_attempts($params);
 
     # For designs with genes on the reverse strand we need to reverse complement the primers
     # and store them such that the forward primer e.g. GF1, lies on the reverse strand
@@ -490,9 +489,9 @@ sub crispr_PCR_primers{
     $self->log->info("PCR Target start: $target_start");
     $self->log->info("PCR Target end: $target_end");
 
-    my $strand = 1; # FIXME: what should this be???
+    my $strand = 1;
 
-    my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new(
+    my $params = {
         base_dir                    => $work_dir,
         species                     => $crispr->species_id,
         strand                      => $strand,
@@ -500,9 +499,9 @@ sub crispr_PCR_primers{
         target_start                => $target_start,
         target_end                  => $target_end,
         %{ $self->primer_params_from_config }
-    );
+    };
 
-    my ( $primer_data, $seq ) = $primer_finder->find_primers;
+    my ( $primer_data, $seq ) = $self->run_generate_primers_attempts($params);
 
     unless ( $primer_data ) {
         $self->log->error( 'FAIL: Unable to generate crispr PCR primers for well' );
@@ -587,9 +586,7 @@ sub find_internal_primer {
         $dir->mkpath;
         $primer_params{base_dir} = $dir;
 
-        my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new( %primer_params );
-
-        my ( $internal_primer_data ) = $primer_finder->find_primers;
+        my ( $internal_primer_data ) = $self->run_generate_primers_attempts(\%primer_params);
         if ( $internal_primer_data ) {
             $primers->{internal} = $internal_primer_data->[0]{reverse};
             return $primers;
@@ -756,6 +753,71 @@ sub calculate_product_size_avoid {
     return $avoid_size;
 }
 
+sub run_generate_primers_attempts {
+    my ( $self, $params ) = @_;
+
+    my ($primer_data, $seq, $five_prime_region_size);
+    if($self->run_on_farm){
+        # Write GeneratePrimersAttempts constructor params to file
+        my $base_dir = $params->{base_dir};
+
+        $params->{base_dir} = $base_dir->stringify;
+        $params->{primer3_config_file} = $params->{primer3_config_file}->stringify;
+
+        my $params_file = $base_dir->file( 'generate_primers_params.yaml' );
+
+        DumpFile("$params_file", $params);
+
+        my $out_file = $base_dir->file( 'generated_primers.json' );
+
+        my $primer_script = '/nfs/team87/farm3_lims2_vms/software/perl/bin/generate_primers_attempts.pl';
+        my @cmd = ( $primer_script,
+               '--params-file' => "$params_file",
+               '--output-file' => "$out_file",
+               );
+
+        my $runner = WebAppCommon::Util::FarmJobRunner->new;
+
+        my $done;
+        $self->log->debug('Command to submit to farm: ',(join " ", @cmd));
+        try {
+            $done = $runner->submit_and_wait(
+                out_file => $base_dir->file( 'run_generate_primers.out' ),
+                err_file => $base_dir->file( 'run_generate_primers.err' ),
+                memory_required => '4000',
+                queue => 'small',
+                timeout  => 300,
+                interval => 10,
+                cmd      => \@cmd,
+            );
+
+            $self->log->debug( "Job completion status: $done" );
+        }
+        catch {
+            die("Error running primer generation job on farm ".$_);
+        };
+
+        if($done){
+            my $results = decode_json( $out_file->slurp );
+            $primer_data = $results->{primer_data};
+            $seq = Bio::Seq->new( -seq => $results->{seq} );
+            # This is needed for internal primer generation
+            # Output file contains five and three prime size and offsets
+            $five_prime_region_size = $results->{five_prime_region_size};
+        }
+        else{
+            die("Primer generation on farm failed or did not complete within expected time");
+        }
+    }
+    else{
+        my $primer_finder = HTGT::QC::Util::GeneratePrimersAttempts->new($params);
+        ($primer_data, $seq) = $primer_finder->find_primers;
+        # This is needed for internal primer generation
+        $five_prime_region_size = $primer_finder->five_prime_region_size;
+    }
+
+    return ($primer_data, $seq, $five_prime_region_size);
+}
 __PACKAGE__->meta->make_immutable;
 
 1;
