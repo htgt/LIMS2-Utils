@@ -75,6 +75,7 @@ my @mouse_link_names = (
     'MGP Recovery',
     'Pathogen Group 1',
     'Pathogen Group 2',
+    'Pathogen Group 3',
 );
 
 INFO 'Generating front page report cache...';
