@@ -46,6 +46,7 @@ unless(-d $report_name_leader){
 }
 
 my $report_name_trailer = '.html';
+my $report_name_trailer_simple = '_simple.html';
 my $csv_name_trailer = '.csv';
 my %front_page_url = (
     'human' => ("$base_path/public_reports/sponsor_report?generate_cache=1&species=Human"),
@@ -74,6 +75,7 @@ my @mouse_link_names = (
     'MGP Recovery',
     'Pathogen Group 1',
     'Pathogen Group 2',
+    'Pathogen Group 3',
 );
 
 INFO 'Generating front page report cache...';
@@ -95,28 +97,21 @@ sub cache_reports {
 
     my $mech = WWW::Mechanize->new();
 
-    INFO "..will cache these $species reports:";
-    foreach my $name ( @link_names ) {
-        INFO '.... ' . $name;
-    }
-
-    my $first_time_species = 1;
+    INFO 'Fetch top level ' . $species . ' page...';
+    my $top_r = $mech->get( $front_page_url{$species} );
+    server_responder( $top_r );
+    cache_front_page( $mech, $species );
 
     foreach my $name ( @link_names ) {
-        my $r; # The server's HTTP::Response
-        INFO 'Fetch top level ' . $species . ' page...';
-        $r = $mech->get( $front_page_url{$species} );
-        server_responder( $r );
-        if ( $first_time_species ) {
-            cache_front_page( $mech, $species );
-            $first_time_species = 0;
-        }
-        INFO 'Fetching page for ' . $name . ' report...';
-        $r = $mech->follow_link( url_regex => qr/$name/ );
-        server_responder( $r );
-        cache_sub_page( $mech, $name );
+        my $sub_r = $mech->get( $front_page_url{$species} );
+        INFO 'Fetching sub level ' . $name . ' report for ' . $species . ' ...';
+        $sub_r = $mech->follow_link( url_regex => qr/$name/ );
+        server_responder( $sub_r );
+        cache_sub_page_full( $mech, $name );
+        cache_sub_page_simple( $mech, $name );
         cache_csv_content( $mech, $name );
     }
+
     return;
 }
 
@@ -124,43 +119,82 @@ sub cache_front_page {
     my $mech = shift;
     my $species = shift;
 
+    INFO "..caching front page $species reports:";
     my $content = $mech->content();
 
-    $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes/cached_sponsor_report\/$1/g;
+    $content =~ s/sponsor_report\/[^\/]+\/([^\/]+)\/Genes\?[^"]*/cached_sponsor_report\/$1/g;
     $content =~ s/without_cache/with_cache/g;
-    cache_report_content( $content, $species );
+    $content =~ s/(?<=[^:])\/\/+/\//g;
 
-    return;
-}
-
-sub cache_sub_page {
-    my $mech = shift;
-    my $species = shift;
-
-    my $content = $mech->content();
-    $content =~ s/sponsor_report\/[^\/]*\/([^\/]*)\/Genes/cached_sponsor_csv\/$1/g;
-    $content =~ s/without_cache/with_cache/g;
-    cache_report_content( $content, $species );
-    return;
-}
-
-sub cache_report_content {
-    my $sub_page_html = shift;
-    my $name = shift;
-
-    my $report_file_name = report_file( $name );
-    INFO 'Writing html for ' . $name . ' report to ' . $report_file_name;
+    my $report_file_name = report_file( $species );
+    INFO 'Writing html for front page' . $species . ' to ' . $report_file_name;
     open( my $html_file_h, ">:encoding(UTF-8)", $report_file_name )
         or die ERROR "Unable to open $report_file_name: $!";
-    print $html_file_h $sub_page_html;
+    print $html_file_h $content;
     close( $html_file_h )
         or die ERROR "Unable to close $report_file_name: $!";
     my $host = hostname;
     if ( $host eq 't87-batch' ) { # t87-batch does not seem able to access $ENV{'HOSTNAME'}!
         copy_file_to_remote_storage( $report_file_name );
     }
+
     return;
 }
+
+
+sub cache_sub_page_full {
+    my $mech = shift;
+    my $species = shift;
+
+    my $content = $mech->content();
+    $content =~ s/sponsor_report\/[^\/]+\/([^\/]+)\/Genes[^>]*type=simple/cached_sponsor_report_simple\/$1/g;
+    $content =~ s/sponsor_report\/[^\/]+\/([^\/]+)\/Genes[^>]*csv=1/cached_sponsor_csv\/$1/g;
+    $content =~ s/without_cache/with_cache/g;
+    $content =~ s/(?<=[^:])\/\/+/\//g;
+
+    my $report_file_name = report_file( $species );
+    INFO 'Writing html for ' . $species . ' full report to ' . $report_file_name;
+    open( my $html_file_h, ">:encoding(UTF-8)", $report_file_name )
+        or die ERROR "Unable to open $report_file_name: $!";
+    print $html_file_h $content;
+    close( $html_file_h )
+        or die ERROR "Unable to close $report_file_name: $!";
+    my $host = hostname;
+    if ( $host eq 't87-batch' ) { # t87-batch does not seem able to access $ENV{'HOSTNAME'}!
+        copy_file_to_remote_storage( $report_file_name );
+    }
+
+    return;
+}
+
+sub cache_sub_page_simple {
+    my $mech = shift;
+    my $species = shift;
+
+    my $r = $mech->follow_link( url_regex => qr/type=simple/ );
+    server_responder( $r );
+
+    my $content = $mech->content();
+    $content =~ s/sponsor_report\/[^\/]+\/([^\/]+)\/Genes[^>]*type=full/cached_sponsor_report\/$1/g;
+    $content =~ s/sponsor_report\/[^\/]+\/([^\/]+)\/Genes[^>]*csv=1/cached_sponsor_csv\/$1/g;
+    $content =~ s/without_cache/with_cache/g;
+    $content =~ s/(?<=[^:])\/\/+/\//g;
+
+    my $report_file_name = report_file_simple( $species );
+    INFO 'Writing html for ' . $species . ' simple report to ' . $report_file_name;
+    open( my $html_file_h, ">:encoding(UTF-8)", $report_file_name )
+        or die ERROR "Unable to open $report_file_name: $!";
+    print $html_file_h $content;
+    close( $html_file_h )
+        or die ERROR "Unable to close $report_file_name: $!";
+    my $host = hostname;
+    if ( $host eq 't87-batch' ) { # t87-batch does not seem able to access $ENV{'HOSTNAME'}!
+        copy_file_to_remote_storage( $report_file_name );
+    }
+
+    return;
+}
+
 
 sub cache_csv_content {
     my $mech = shift;
@@ -205,6 +239,15 @@ sub report_file {
 
     return $report_name_leader . $this_report . $report_name_trailer;
 }
+
+sub report_file_simple {
+    my $this_report = shift;
+
+    $this_report =~ s/\ /_/g;
+
+    return $report_name_leader . $this_report . $report_name_trailer_simple;
+}
+
 
 sub csv_file {
     my $this_csv = shift;

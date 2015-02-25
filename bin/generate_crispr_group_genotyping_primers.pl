@@ -63,7 +63,9 @@ for my $id ( @crispr_group_ids ) {
     die( "Unable to find crispr group with id $id" )
         unless $crispr_group;
 
-    my ( $picked_primers, $seq ) = $primer_util->crispr_group_genotyping_primers( $crispr_group );
+    # Primer util returns primer_data arrayref and Bio::Seq object
+    my ( $primer_data, $seq ) = $primer_util->crispr_group_genotyping_primers( $crispr_group );
+    my $picked_primers = $primer_data->[0];
 
     dump_output( $picked_primers, $seq, $crispr_group );
 

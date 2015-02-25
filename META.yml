@@ -19,6 +19,7 @@ name: LIMS2-Util
 requires:
   Bio::EnsEMBL::Registry: 0
   Bio::Perl: 0
+  Bio::Seq: 0
   Carp: 0
   Class::Data::Inheritable: 0
   Config::Any: 0
@@ -72,9 +73,10 @@ requires:
   Try::Tiny: 0
   URI: 0
   WWW::Mechanize: 0
+  WebAppCommon::Util::FarmJobRunner: 0
   YAML::Any: 0
   base: 0
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.055
+version: 0.063

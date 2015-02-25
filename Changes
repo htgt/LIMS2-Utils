@@ -1,3 +1,35 @@
+0.063     2015-02-25 13:52:34 Europe/London
+
+   primer generation extended to support more targets
+
+0.062     2015-02-19 17:21:06 Europe/London
+
+    update_gene_solr_index script updated to include chromosome, crispr data removed
+
+0.061     2015-02-19 16:43:45 Europe/London
+
+    data deletion from genotyping primers hash
+
+0.060     2015-02-18 13:18:05 Europe/London
+
+    generate_fp_report_cache modified to default for full report
+
+0.059     2015-01-21 16:33:02 Europe/London
+
+   trying at the cached fp reports to localy fiz the multiple slashes when on staging, again
+
+0.058     2015-01-21 15:29:01 Europe/London
+
+    trying at the cached fp reports to localy fiz the multiple slashes when on staging, again
+
+0.057     2015-01-21 14:55:14 Europe/London
+
+    trying at the cached fp reports to localy fiz the multiple slashes when on staging
+
+0.056     2015-01-21 11:30:13 Europe/London
+
+    Added support for caching of full fs reports
+
 0.055     2015-01-20 09:28:26 Europe/London
 
 Add method to WGE api to generate off targets by sequence.
