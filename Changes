@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.063     2015-02-25 13:52:34 Europe/London
+
+   primer generation extended to support more targets
+
 0.062     2015-02-19 17:21:06 Europe/London
 
     update_gene_solr_index script updated to include chromosome, crispr data removed
