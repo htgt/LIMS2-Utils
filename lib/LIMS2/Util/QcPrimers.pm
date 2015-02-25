@@ -9,9 +9,14 @@ LIMS2::Util::QcPrimers
 Currently generate genotyping primers for various targets:
     - MGP Recovery Crispr Groups
     - Short Arm Vector Crispr Groups
+    - Single and paired crispr sequencing primers
+    - PCR primers to amplify the region containing a set of sequencing primers
+    - Gibson designs
 
 More targets can be added by creating new config files and adding this
-to the PRIMER_PROJECT_CONFIG_FILES hash.
+to the PRIMER_PROJECT_CONFIG_FILES hash. If a new type of target, e.g. nonsense
+crispr oligo, needs to be added you'll need a new xxxx_primers method to get
+the appropriate start and end coordinates for the region of interest
 
 =cut
 
@@ -42,8 +47,8 @@ my %PRIMER_PROJECT_CONFIG_FILES = (
             || '/opt/t87/global/conf/primers/mgp_recovery_genotyping.yaml',
     short_arm_vectors => $ENV{SHORT_ARM_VECTOR_GENOTYPING_PRIMER_CONFIG}
             || '/opt/t87/global/conf/primers/short_arm_vector_genotyping.yaml',
-    crispr_single_or_pair => $ENV{CRISPR_GENOTYPING_PRIMER_CONFIG}
-            || '/opt/t87/global/conf/primers/crispr_genotyping_primer_conf.yaml',
+    crispr_sequencing => $ENV{CRISPR_SEQUENCING_PRIMER_CONFIG}
+            || '/opt/t87/global/conf/primers/crispr_sequencing_primer_conf.yaml',
     design_genotyping => $ENV{DESIGN_GENOTYPING_PRIMER_CONFIG}
             || '/opt/t87/global/conf/primers/design_genotyping_primer_conf.yaml',
     crispr_pcr => $ENV{CRISPR_PCR_PRIMER_CONFIG}
@@ -263,16 +268,6 @@ sub _build_output_methods {
     return $methods;
 }
 
-=head2 get_new_primer_finder
-
-Constructs GeneratePrimersAttempts objects
-input:
-  working directory
-  Crispr, CrisprPair or CrisprGroup
-  strand
-
-=cut
-
 sub primer_params_from_config {
     my $self = shift;
 
@@ -289,6 +284,18 @@ sub primer_params_from_config {
     };
     return $params;
 }
+
+=head2 get_new_crispr_primer_finder_params
+
+Constructs the parameters required to create a new GeneratePrimersAttempts object
+targetting a given crispr single, pair or group
+
+input:
+  working directory
+  Crispr, CrisprPair or CrisprGroup
+  strand
+
+=cut
 
 sub get_new_crispr_primer_finder_params {
     my ($self, $work_dir, $crispr_collection, $strand) = @_;
@@ -353,17 +360,17 @@ sub crispr_group_genotyping_primers {
     return ( [ $picked_primers ], $seq, $db_primers );
 }
 
-=head2 crispr_pair_genotyping_primers
+=head2 crispr_sequencing_primers
 
-Generate a pair of primers for a given crispr pair.
+Generate a pair of primers for a given crispr single or pair.
 
 =cut
-sub crispr_single_or_pair_genotyping_primers {
+sub crispr_sequencing_primers {
     my ( $self, $crispr_single_or_pair ) = @_;
     $self->log->info( '====================' );
     $self->log->info( "GENERATE PRIMERS for $crispr_single_or_pair, gene_id: " . $crispr_single_or_pair->gene_id );
 
-    my $work_dir = $self->base_dir->subdir( 'crispr_genotyping_' . $crispr_single_or_pair->id )->absolute;
+    my $work_dir = $self->base_dir->subdir( 'crispr_sequencing_' . $crispr_single_or_pair->id )->absolute;
     $work_dir->mkpath;
 
     $self->log->info( 'Searching for Primers' );
@@ -470,7 +477,8 @@ sub design_genotyping_primers{
 =head2 crispr_PCR_primers
 
 For a set of crispr primers use the oligo start and end positions of the 0 ranked primer pair
-as inputs to generate primers
+as inputs to generate primers. Pass the crispr single/pair/group to this method too as
+we need this to get the species and chromosome.
 
 =cut
 
@@ -669,7 +677,7 @@ sub _persist_primer_data{
                 $chr_strand = $data->{oligo_strand_to_store};
             }
 
-            # Use oligo strand instead of primer type to determine
+            # Use oligo direction instead of primer type to determine
             # strandedness in case we have reversed the primer orientation
             # for design genotyping primers for gene on reverse strand
             my $strand = $data->{oligo_direction} eq 'forward' ? 1 : -1;
