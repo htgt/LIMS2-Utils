@@ -257,8 +257,8 @@ sub _build_output_methods {
                     # e.g. get 0 ranked reverse primer for SR1
                     my $primer_data = shift;
                     my $rank = $primer_set->{rank};
-                    my $picked_primers = $primer_data->[$rank] or return undef;
-                    my $primer = $picked_primers->{$type} or return undef;
+                    my $picked_primers = $primer_data->[$rank] or return;
+                    my $primer = $picked_primers->{$type} or return;
                     # e.g. apply the gc_content fetcher method to the reverse primer
                     return $self->primer_output_methods->{$field_type}->($primer);
                 }
@@ -682,9 +682,10 @@ sub _persist_primer_data{
             # for design genotyping primers for gene on reverse strand
             my $strand = $data->{oligo_direction} eq 'forward' ? 1 : -1;
 
+            my $column_name = $params->{id_column_name};
             my $primer = $self->model->$create_method(
                 {
-                    $params->{id_column_name} => $params->{id},
+                    $column_name    => $params->{id},
                     primer_name     => $primer_set->{$type},
                     primer_seq      => uc( $data->{oligo_seq} ),
                     tm              => $data->{melting_temp},
