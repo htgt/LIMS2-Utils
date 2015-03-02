@@ -44,15 +44,15 @@ with 'MooseX::Log::Log4perl';
 
 my %PRIMER_PROJECT_CONFIG_FILES = (
     mgp_recovery => $ENV{MGP_RECOVERY_GENOTYPING_PRIMER_CONFIG}
-            || '/opt/t87/global/conf/primers/mgp_recovery_genotyping.yaml',
+            || '/nfs/team87/farm3_lims2_vms/conf/primers/mgp_recovery_genotyping.yaml',
     short_arm_vectors => $ENV{SHORT_ARM_VECTOR_GENOTYPING_PRIMER_CONFIG}
-            || '/opt/t87/global/conf/primers/short_arm_vector_genotyping.yaml',
+            || '/nfs/team87/farm3_lims2_vms/conf/primers/short_arm_vector_genotyping.yaml',
     crispr_sequencing => $ENV{CRISPR_SEQUENCING_PRIMER_CONFIG}
-            || '/opt/t87/global/conf/primers/crispr_sequencing_primer_conf.yaml',
+            || '/nfs/team87/farm3_lims2_vms/conf/primers/crispr_sequencing_primer_conf.yaml',
     design_genotyping => $ENV{DESIGN_GENOTYPING_PRIMER_CONFIG}
-            || '/opt/t87/global/conf/primers/design_genotyping_primer_conf.yaml',
+            || '/nfs/team87/farm3_lims2_vms/conf/primers/design_genotyping_primer_conf.yaml',
     crispr_pcr => $ENV{CRISPR_PCR_PRIMER_CONFIG}
-            || '/opt/t87/global/conf/primers/crispr_pcr_primer_conf.yaml',
+            || '/nfs/team87/farm3_lims2_vms/conf/primers/crispr_pcr_primer_conf.yaml',
 );
 
 has model => (
@@ -729,8 +729,10 @@ sub get_output_values{
     my ($self, $primer_data) = @_;
     my $values;
 
-    die "No primer data provided to get_output_values" unless $primer_data;
-    $self->log->info("primer data for output: ",Dumper($primer_data));
+    unless($primer_data){
+        $self->log->debug("No primer data provided to get_output_values");
+        return;
+    }
 
     while ( my($field_name, $method) = each %{ $self->output_methods }){
         $values->{$field_name} = $method->($primer_data);
