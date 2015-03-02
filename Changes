@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.064     2015-03-02 15:57:13 Europe/London
+
+  location of primer generation config files changed
+
 0.063     2015-02-25 13:52:34 Europe/London
 
    primer generation extended to support more targets
