@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.065     2015-03-16 11:21:16 Europe/London
+
+  added method to fetch list of primer names from QcPrimers
+
 0.064     2015-03-02 15:57:13 Europe/London
 
   location of primer generation config files changed
