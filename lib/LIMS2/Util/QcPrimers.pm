@@ -103,7 +103,6 @@ has primer3_config_file => (
 
 sub _build_primer3_config_file {
     my $self = shift;
-    $self->log->info(Dumper($self->config));
     if ( my $file_name = $self->config->{primer3_config} ) {
         $self->log->info("Using primer3 config file $file_name");
         return file( $file_name )->absolute;
@@ -331,7 +330,7 @@ sub crispr_group_genotyping_primers {
     my ( $primer_data, $seq, $five_prime_region_size) = $self->run_generate_primers_attempts($params);
 
     unless ( $primer_data ) {
-        $self->log->error( 'FAIL: Unable to generate primer pair for crispr group' );
+        $self->log->error( 'FAIL: Unable to generate primer pair for crispr group '.$crispr_group->id  );
         return;
     }
 
@@ -341,7 +340,7 @@ sub crispr_group_genotyping_primers {
         $five_prime_region_size );
 
     unless( $picked_primers ) {
-        $self->log->error( 'FAIL: Unable to find internal primer for crispr group' );
+        $self->log->error( 'FAIL: Unable to find internal primer for crispr group '.$crispr_group->id  );
         return;
     }
 
@@ -380,7 +379,7 @@ sub crispr_sequencing_primers {
     my ( $primer_data, $seq ) = $self->run_generate_primers_attempts($params);
 
     unless ( $primer_data ) {
-        $self->log->error( 'FAIL: Unable to generate primer pair for crispr' );
+        $self->log->error( 'FAIL: Unable to generate primer pair for crispr '. $crispr_single_or_pair->id );
         return;
     }
 
@@ -455,7 +454,7 @@ sub design_genotyping_primers{
     }
 
     unless ( $primer_data ) {
-        $self->log->error( 'FAIL: Unable to generate genotyping primers for design' );
+        $self->log->error( 'FAIL: Unable to generate genotyping primers for design '. $design->id );
         return;
     }
 
@@ -512,7 +511,7 @@ sub crispr_PCR_primers{
     my ( $primer_data, $seq ) = $self->run_generate_primers_attempts($params);
 
     unless ( $primer_data ) {
-        $self->log->error( 'FAIL: Unable to generate crispr PCR primers for well' );
+        $self->log->error( 'FAIL: Unable to generate crispr PCR primers for '.$crispr->id_column_name.': '.$crispr->id );
         return;
     }
 
@@ -829,6 +828,20 @@ sub run_generate_primers_attempts {
 
     return ($primer_data, $seq, $five_prime_region_size);
 }
+
+# Helper method to fetch all primer names from the config file
+# Useful for checking if any of them exist in db etc.
+sub primer_name_list {
+    my ($self) = @_;
+    my @primer_names;
+    foreach my $type ( qw( forward reverse internal ) ) {
+        foreach my $set (@{ $self->primer_name_sets }){
+            push @primer_names, $set->{$type};
+        }
+    }
+    return grep { $_ } @primer_names;
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
