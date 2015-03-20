@@ -450,7 +450,7 @@ sub design_genotyping_primers{
     # For designs with genes on the reverse strand we need to reverse complement the primers
     # and store them such that the forward primer e.g. GF1, lies on the reverse strand
     # and the reverse primer, e.g. GR1, lies on the forward strand
-    if($strand == -1){
+    if($params->{strand} == -1){
         $self->log->debug("Reverse complementing primers for gene on reverse strand");
         foreach my $primer_group (@$primer_data){
             foreach my $primer_type (keys %$primer_group){
