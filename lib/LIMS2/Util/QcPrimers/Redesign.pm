@@ -11,6 +11,7 @@ LIMS2::Util::QcPrimers::Redesign
 
 use Moose;
 use WebAppCommon::Util::EnsEMBL;
+use DDP;
 use LIMS2::Exception;
 
 use namespace::autoclean;
@@ -67,8 +68,9 @@ has primer_sets => (
 );
 
 has failed_primers => (
-    is  => 'rw',
-    isa => 'HashRef',
+    is      => 'rw',
+    isa     => 'HashRef',
+    default => sub { {} },
 );
 
 has primer3_task => (
@@ -77,9 +79,15 @@ has primer3_task => (
     init_arg => undef,
 );
 
-has [ 'sequence_included_regions' , 'sequence_excluded_regions' ] => (
+has sequence_excluded_regions => (
     is       => 'rw',
     isa      => 'ArrayRef',
+    init_arg => undef,
+);
+
+has sequence_included_region => (
+    is       => 'rw',
+    isa      => 'HashRef',
     init_arg => undef,
 );
 
@@ -110,20 +118,29 @@ sub BUILD {
     }
 
     if ( $self->poly_base_fail && $self->design ) {
-        # TODO work out way of doing this for designs if its ever needed...
-        die( 'Sorry, can currently only redesign polyN primers fails for crisprs' );
+        if ( $self->design ) {
+            # TODO work out way of doing this for designs if its ever needed...
+            die( 'Sorry, can currently only redesign polyN primers fails for crisprs' );
+        }
+        my $primer_type_count = @{ $self->primer_types };
+        if ( $primer_type_count > 1 ) {
+            # SEQUENCE_INCLUDED_REGION only takes one value so we can only redesign
+            # one primer at a time using this option
+            die( 'Can only redesign 1 primer at a time for poly base fail reasons' );
+        }
     }
 
     return;
 }
 
-=head2 redesign_primer
+=head2 redesign_primers
 
 desc
 
 =cut
-sub redesign_primer {
+sub redesign_primers {
     my ( $self ) = @_;
+    $self->log->info( 'Redesigning primers for ...' );
 
     # process the primers name sets from the config file into a hash of useful data
     $self->process_primer_name_sets;
@@ -135,9 +152,11 @@ sub redesign_primer {
 
     if ( $self->poly_base_fail ) {
         $self->calculate_sequence_include_regions;
+        $self->log->info( 'Sequence include region: ' . p( $self->sequence_included_region ) )
     }
     else {
         $self->calculate_sequence_exclude_regions;
+        $self->log->info( 'Sequence excluded regions: ' . p( $self->sequence_excluded_regions ) )
     }
 
     # TODO create new primers... call parent class method
@@ -148,6 +167,10 @@ sub redesign_primer {
     # - Can I work it out dynamically?
     # - ... anything else?
 
+    #TODO mark the failed primers as rejected if they are already not marked as such
+
+    # FOR NOW call method in run script
+    return;
 }
 
 =head2 process_primer_types
@@ -157,13 +180,14 @@ desc
 =cut
 sub process_primer_types {
     my ( $self ) = @_;
+    $self->log->debug('working out primer types ..');
 
     my $primer_name = $self->primer_types->[0];
     my $primer_info = $self->primer_sets->{ $primer_name };
     unless ( $primer_info ) {
         die( "Do not recognise primer type $primer_name for profile " . $self->primer_project_name );
     }
-    my $primer_name_set = { $primer_info->{type} = $primer_name };
+    my $primer_name_set = { $primer_info->{type} => $primer_name };
 
     my $primer_type_count = @{ $self->primer_types };
     if ( $primer_type_count == 1 ) {
@@ -183,6 +207,7 @@ sub process_primer_types {
         die( "You can only specify 1 or 2 failed primers, not $primer_type_count" );
     }
 
+    $self->log->info( 'Primer3 task is: ' . $self->primer3_task );
     # update primer_name_sets to the primer(s) we want to generate
     $self->primer_name_sets( [ $primer_name_set ] );
 
@@ -196,6 +221,7 @@ desc
 =cut
 sub grab_failed_primers {
     my ( $self ) = @_;
+    $self->log->debug('Grabbing failed primers..');
 
     if ( $self->crispr ) {
         for my $type ( @{ $self->primer_types } ) {
@@ -231,6 +257,7 @@ desc
 =cut
 sub process_primer_name_sets {
     my ( $self ) = @_;
+    $self->log->debug( 'process primer name sets' );
 
     my %primer3_tasks = (
         forward  => 'pick_left_only',
@@ -241,7 +268,7 @@ sub process_primer_name_sets {
     my $pair = 1;
     for my $set ( @{ $self->primer_name_sets } ) {
         foreach my $type ( qw( forward reverse internal ) ) {
-            next unless exists $self->{$type};
+            next unless exists $set->{$type};
             $primer_sets{ $set->{$type} } = {
                 task => $primer3_tasks{ $type },
                 type => $type,
@@ -270,6 +297,7 @@ sub set_failed_primer {
     elsif ( $count > 1 ) {
         die( "Multiple non validated primers of type $type found" );
     }
+    $self->log->debug( "Found one primer of type $type" );
 
     $self->failed_primers->{$type} = $failed_primer_rs->first;
     return;
@@ -282,9 +310,11 @@ ONLY FOR CRISPR PRIMERS FOR NOW
 =cut
 sub calculate_sequence_include_regions {
     my ( $self ) = @_;
-    my @sequence_included_regions;
+    $self->log->info( 'Calculate sequence include region' );
 
     my $chromosome = $self->crispr->chr_name;
+    # There will only ever be one primer here, we can only have
+    # one value for sequence included region option
     for my $primer_type ( keys %{ $self->failed_primers } ) {
         my $primer = $self->failed_primers->{$primer_type};
         my $primer_info = $primer->as_hash;
@@ -292,33 +322,36 @@ sub calculate_sequence_include_regions {
         if ( $self->primer_sets->{ $primer_type }{ type } eq 'forward' ) {
             my $polyn_locations = $self->find_poly_base_locations(
                 $primer_info->{locus}{chr_start}, # start
-                $self->crispr->end,               # end
+                $self->crispr->start,             # end
                 $chromosome,                      # chromosome
             );
 
-            push @sequence_included_regions, {
-                start => $polyn_locations->[-1]{end},
-                end   => $self->crispr->start,
-            };
+            $self->sequence_included_region(
+                {
+                    start => $polyn_locations->[-1]{end},
+                    end   => $self->crispr->start,
+                }
+            );
         }
         elsif ( $self->primer_sets->{ $primer_type }{ type } eq 'reverse' ) {
             my $polyn_locations = $self->find_poly_base_locations(
-                $self->crispr->start,             # start
+                $self->crispr->end,               # start
                 $primer_info->{locus}{chr_end},   # end
                 $chromosome,                      # chromosome
             );
 
-            push @sequence_included_regions, {
-                start => $self->crispr->end,
-                end   => $polyn_locations->[0]{start},
-            };
+            $self->sequence_included_region(
+                {
+                    start => $self->crispr->end,
+                    end   => $polyn_locations->[0]{start},
+                }
+            );
         }
         else {
             die( 'Currently can not use poly_base option with internal primers' );
         }
     }
 
-    $self->sequence_included_regions( \@sequence_included_regions );
 
     return;
 }
@@ -330,14 +363,15 @@ desc
 =cut
 sub calculate_sequence_exclude_regions {
     my ( $self ) = @_;
+    $self->log->info( 'Calculate sequence excluded region' );
     my @sequence_excluded_regions;
 
     for my $primer_type ( keys %{ $self->failed_primers } ) {
         my $primer = $self->failed_primers->{$primer_type};
         my $primer_info = $primer->as_hash;
         push @sequence_excluded_regions, {
-            start => $primer_info->{chr_start},
-            end   => $primer_info->{chr_end},
+            start => $primer_info->{locus}{chr_start},
+            end   => $primer_info->{locus}{chr_end},
         };
     }
 
@@ -353,12 +387,13 @@ desc
 =cut
 sub find_poly_base_locations {
     my ( $self, $start, $end, $chromosome ) = @_;
+    $self->log->info('Searching for Poly base sequence');
 
     my $slice = $self->ensembl_util->get_slice( $start, $end, $chromosome );
     my $seq = $slice->seq;
 
     my @poly_base_positions;
-    while ( $seq =~ /([ACTG])(\1{5,})/g ) {
+    while ( $seq =~ /([ACTG])(\1{4,})/g ) {
         # make into genomic coordinates
         push @poly_base_positions, {
             start => ( $-[0] + $start ),
@@ -384,43 +419,11 @@ around [
     my $params = $self->$orig(@_);
 
     $params->{primer3_task}     = $self->primer3_task;
-    $params->{excluded_regions} = $self->excluded_regions if $self->excluded_regions;
-    $params->{included_regions} = $self->included_regions if $self->included_regions;
+    $params->{excluded_regions} = $self->sequence_excluded_regions if $self->sequence_excluded_regions;
+    $params->{included_regions} = $self->sequence_included_region if $self->sequence_included_region;
 
     return $params;
 };
-
-#around 'get_new_crispr_primer_finder_params' => sub {
-    #my $orig = shift;
-    #my $self = shift;
-
-    #my $params = $self->$orig(@_);
-
-    ## TODO modify params
-    ## add in primer task and other stuff
-#};
-
-#around 'get_new_crispr_PCR_primer_finder_params' => sub {
-    #my $orig = shift;
-    #my $self = shift;
-
-    #my $params = $self->$orig( @_ );
-
-    ## TODO modify params
-    ## add in primer task and other stuff
-
-#};
-
-#around 'get_new_design_primer_finder_params' => sub {
-    #my $orig = shift;
-    #my $self = shift;
-
-    #my $params = $self->$orig( @_ );
-
-    ## TODO modify params
-    ## add in primer task and other stuff
-
-#};
 
 __PACKAGE__->meta->make_immutable;
 
