@@ -79,15 +79,11 @@ has primer3_task => (
     init_arg => undef,
 );
 
-has sequence_excluded_regions => (
+# NOTE sequence_included_region will only ever take one value but we are keeping
+# it as a array to keep the code dealing with these values uniform
+has [ 'sequence_included_region', 'sequence_excluded_regions' ] => (
     is       => 'rw',
     isa      => 'ArrayRef',
-    init_arg => undef,
-);
-
-has sequence_included_region => (
-    is       => 'rw',
-    isa      => 'HashRef',
     init_arg => undef,
 );
 
@@ -327,10 +323,10 @@ sub calculate_sequence_include_regions {
             );
 
             $self->sequence_included_region(
-                {
-                    start => $polyn_locations->[-1]{end},
-                    end   => $self->crispr->start,
-                }
+                [   {   start => $polyn_locations->[-1]{end},
+                        end   => $self->crispr->start,
+                    }
+                ]
             );
         }
         elsif ( $self->primer_sets->{ $primer_type }{ type } eq 'reverse' ) {
@@ -341,10 +337,10 @@ sub calculate_sequence_include_regions {
             );
 
             $self->sequence_included_region(
-                {
-                    start => $self->crispr->end,
-                    end   => $polyn_locations->[0]{start},
-                }
+                [   {   start => $self->crispr->end,
+                        end   => $polyn_locations->[0]{start},
+                    }
+                ]
             );
         }
         else {
