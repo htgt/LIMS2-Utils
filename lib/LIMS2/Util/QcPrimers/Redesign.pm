@@ -45,6 +45,10 @@ has crispr => (
     is  => 'ro',
 );
 
+has target_type => (
+    is => 'ro',
+);
+
 has primer_types => (
     is       => 'ro',
     isa      => 'ArrayRef[Str]',
@@ -132,10 +136,12 @@ desc
 =cut
 sub redesign_primers {
     my ( $self ) = @_;
-    $self->log->info( 'Redesigning '
-            . $self->primer_project_name
-            . ' primers '
-            . join( ',', @{ $self->primer_types } ) );
+    $self->log->info(
+        'Redesigning ' . $self->primer_project_name
+        . ' primers ' . join( ',', @{ $self->primer_types } )
+        . ' for ' . $self->target_type
+        . ' id: ' . ( $self->crispr ? $self->crispr->id : $self->design->id )
+    );
 
     # process the primers name sets from the config file into a hash of useful data
     $self->process_primer_name_sets;
