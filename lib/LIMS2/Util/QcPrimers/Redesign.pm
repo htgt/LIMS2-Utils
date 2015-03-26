@@ -108,9 +108,6 @@ sub BUILD {
     if ( !$self->crispr && !$self->design ) {
         die('Must specify a design or crispr');
     }
-    elsif ( $self->crispr && $self->design ) {
-        die('Can not specify both a design and crispr');
-    }
 
     if ( $self->poly_base_type && $self->design ) {
         if ( $self->design ) {
@@ -135,7 +132,10 @@ desc
 =cut
 sub redesign_primers {
     my ( $self ) = @_;
-    $self->log->info( 'Redesigning primers for ...' );
+    $self->log->info( 'Redesigning '
+            . $self->primer_project_name
+            . ' primers '
+            . join( ',', @{ $self->primer_types } ) );
 
     # process the primers name sets from the config file into a hash of useful data
     $self->process_primer_name_sets;
@@ -154,13 +154,16 @@ sub redesign_primers {
         $self->log->info( 'Sequence excluded regions: ' . p( $self->sequence_excluded_regions ) )
     }
 
-    # make sure failed primers are marked as rejected
+    # NOTE this will mark all non validated primers of the type we are redesigning to rejected
     if ( $self->persist_primers ) {
         $self->model->txn_do(
             sub {
-                for my $failed_primer ( values %{ $self->failed_primers } ) {
-                    $failed_primer->update( { is_rejected => 1 } )
-                        unless $failed_primer->is_rejected;
+                for my $failed_primer_types ( keys %{ $self->failed_primers } ) {
+                    $self->log->warn( "Marking all non validated $failed_primer_types primers as rejected" );
+                    for my $failed_primer ( @{ $self->failed_primers->{$failed_primer_types} } ) {
+                        $failed_primer->update( { is_rejected => 1 } )
+                            unless $failed_primer->is_rejected;
+                    }
                 }
             }
         );
@@ -171,7 +174,7 @@ sub redesign_primers {
         ( $primer_data, $seq ) = $self->crispr_sequencing_primers( $self->crispr );
     }
     elsif ( $self->primer_project_name eq 'crispr_pcr' ) {
-        my $seq_primers = $self->crispr_sequencing_primers();
+        my $seq_primers = $self->find_crispr_sequencing_primers();
         ( $primer_data, $seq ) = $self->crispr_PCR_primers( $seq_primers, $self->crispr );
     }
     elsif ($self->primer_project_name eq 'mgp_recovery'
@@ -185,7 +188,6 @@ sub redesign_primers {
     else {
         die( "Not setup to redesign primers for primer project: " . $self->primer_project_name );
     }
-
 
     return( $primer_data, $seq );
 }
@@ -311,14 +313,9 @@ sub set_failed_primer {
     if ( $count == 0 ) {
         die( "No non validated primer of type $type found" );
     }
-    # TODO actually, we should be able to deal with multiple non validated
-    # primers, we just need to ignore all of these primer regions...
-    elsif ( $count > 1 ) {
-        die( "Multiple non validated primers of type $type found" );
-    }
-    $self->log->debug( "Found one primer of type $type" );
+    $self->log->debug( "Found $count non validated primers of type $type" );
 
-    $self->failed_primers->{$type} = $failed_primer_rs->first;
+    $self->failed_primers->{$type} = [ $failed_primer_rs->all ];
     return;
 }
 
@@ -335,7 +332,8 @@ sub calculate_sequence_include_regions {
     # There will only ever be one primer here, we can only have
     # one value for sequence included region option
     for my $primer_type ( keys %{ $self->failed_primers } ) {
-        my $primer = $self->failed_primers->{$primer_type};
+        # take first primer, I think any failed primer will do here
+        my $primer = $self->failed_primers->{$primer_type}[0];
         my $primer_info = $primer->as_hash;
 
         if ( $self->primer_sets->{ $primer_type }{ type } eq 'forward' ) {
@@ -386,12 +384,13 @@ sub calculate_sequence_exclude_regions {
     my @sequence_excluded_regions;
 
     for my $primer_type ( keys %{ $self->failed_primers } ) {
-        my $primer = $self->failed_primers->{$primer_type};
-        my $primer_info = $primer->as_hash;
-        push @sequence_excluded_regions, {
-            start => $primer_info->{locus}{chr_start},
-            end   => $primer_info->{locus}{chr_end},
-        };
+        for my $primer ( @{ $self->failed_primers->{$primer_type} } ) {
+            my $primer_info = $primer->as_hash;
+            push @sequence_excluded_regions, {
+                start => $primer_info->{locus}{chr_start},
+                end   => $primer_info->{locus}{chr_end},
+            };
+        }
     }
 
     $self->sequence_excluded_regions( \@sequence_excluded_regions );
@@ -431,12 +430,12 @@ sub find_poly_base_locations {
     return \@poly_base_positions;
 }
 
-=head2 crispr_sequencing_primers
+=head2 find_crispr_sequencing_primers
 
 desc
 
 =cut
-sub crispr_sequencing_primers {
+sub find_crispr_sequencing_primers {
     my ( $self ) = @_;
 
     # Currently this method returns the first non-rejected sequencing primer pair
