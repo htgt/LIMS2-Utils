@@ -52,10 +52,9 @@ has primer_types => (
 );
 
 # only for sequencing primers
-has poly_base_fail => (
-    is      => 'ro',
-    isa     => 'Bool',
-    default => 0,
+has poly_base_type => (
+    is  => 'ro',
+    isa => 'Str',
 );
 
 #
@@ -113,7 +112,7 @@ sub BUILD {
         die('Can not specify both a design and crispr');
     }
 
-    if ( $self->poly_base_fail && $self->design ) {
+    if ( $self->poly_base_type && $self->design ) {
         if ( $self->design ) {
             # TODO work out way of doing this for designs if its ever needed...
             die( 'Sorry, can currently only redesign polyN primers fails for crisprs' );
@@ -146,7 +145,7 @@ sub redesign_primers {
     # grab failed primer(s), mostly one but may be name of a pair
     $self->grab_failed_primers;
 
-    if ( $self->poly_base_fail ) {
+    if ( $self->poly_base_type ) {
         $self->calculate_sequence_include_regions;
         $self->log->info( 'Sequence include region: ' . p( $self->sequence_included_region ) )
     }
@@ -155,18 +154,40 @@ sub redesign_primers {
         $self->log->info( 'Sequence excluded regions: ' . p( $self->sequence_excluded_regions ) )
     }
 
-    # TODO create new primers... call parent class method
-    # how do I work out the method we need to call on the parent class to actually
-    # create the primers:
-    # - store the method name in the primer config file?
-    # - store in in a hash?? ( like the PRIMER_PROJECT_CONFIG_FILES hash in the parent class )
-    # - Can I work it out dynamically?
-    # - ... anything else?
+    # make sure failed primers are marked as rejected
+    if ( $self->persist_primers ) {
+        $self->model->txn_do(
+            sub {
+                for my $failed_primer ( values %{ $self->failed_primers } ) {
+                    $failed_primer->update( { is_rejected => 1 } )
+                        unless $failed_primer->is_rejected;
+                }
+            }
+        );
+    }
 
-    #TODO mark the failed primers as rejected if they are already not marked as such
+    my ( $primer_data, $seq );
+    if ( $self->primer_project_name eq 'crispr_sequencing' ) {
+        ( $primer_data, $seq ) = $self->crispr_sequencing_primers( $self->crispr );
+    }
+    elsif ( $self->primer_project_name eq 'crispr_pcr' ) {
+        my $seq_primers = $self->crispr_sequencing_primers();
+        ( $primer_data, $seq ) = $self->crispr_PCR_primers( $seq_primers, $self->crispr );
+    }
+    elsif ($self->primer_project_name eq 'mgp_recovery'
+        || $self->primer_project_name eq 'short_arm_vectors' )
+    {
+        ( $primer_data, $seq ) = $self->crispr_group_genotyping_primers( $self->crispr );
+    }
+    elsif ( $self->primer_project_name eq 'design_genotyping' ) {
+        ( $primer_data, $seq ) = $self->design_genotyping_primers( $self->design );
+    }
+    else {
+        die( "Not setup to redesign primers for primer project: " . $self->primer_project_name );
+    }
 
-    # FOR NOW call method in run script
-    return;
+
+    return( $primer_data, $seq );
 }
 
 =head2 process_primer_types
@@ -290,6 +311,8 @@ sub set_failed_primer {
     if ( $count == 0 ) {
         die( "No non validated primer of type $type found" );
     }
+    # TODO actually, we should be able to deal with multiple non validated
+    # primers, we just need to ignore all of these primer regions...
     elsif ( $count > 1 ) {
         die( "Multiple non validated primers of type $type found" );
     }
@@ -387,10 +410,14 @@ sub find_poly_base_locations {
 
     my $slice = $self->ensembl_util->get_slice( $start, $end, $chromosome );
     my $seq = $slice->seq;
+    my $poly_base = $self->poly_base_type;
+    $self->log->debug("Searching for Poly $poly_base regions in $seq");
 
     my @poly_base_positions;
-    while ( $seq =~ /([ACTG])(\1{4,})/g ) {
+    my $regex = qr/(($poly_base)(\2{5,}))/;
+    while ( $seq =~ /$regex/g ) {
         # make into genomic coordinates
+        $self->log->debug( "Found Poly $poly_base region: $1" );
         push @poly_base_positions, {
             start => ( $-[0] + $start ),
             end   => ( $+[0] + $start ),
@@ -398,10 +425,41 @@ sub find_poly_base_locations {
     }
 
     unless( @poly_base_positions ) {
-        die( 'Can not find polyN run of bases' );
+        die( "Can not find Poly $poly_base run of bases" );
     }
 
     return \@poly_base_positions;
+}
+
+=head2 crispr_sequencing_primers
+
+desc
+
+=cut
+sub crispr_sequencing_primers {
+    my ( $self ) = @_;
+
+    # Currently this method returns the first non-rejected sequencing primer pair
+    # if we don't have good PCR primers they should not have rejected the
+    # sequencing primers so we should be able to find some.
+    my $sf1_primer = $self->crispr->current_primer( 'SF1' )->as_hash;
+    my $sr1_primer = $self->crispr->current_primer( 'SR1' )->as_hash;
+    my $start = $sf1_primer->{locus}{chr_start} + 1;
+    my $end = $sr1_primer->{locus}{chr_end} + 1;
+    # NOTE the SF1 primer may not always be before the SR1...
+    if ( $start > $end ) {
+        my $tmp = $start;
+        $start  = $end;
+        $end    = $tmp;
+    }
+
+    # data structure needed to feed into crispr_PCR_primers method on LIMS2::Util::QcPrimers
+    return [
+        {
+            forward => { oligo_start => $start },
+            reverse => { oligo_end   => $end },
+        },
+    ];
 }
 
 around [
