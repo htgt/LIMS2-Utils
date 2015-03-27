@@ -252,8 +252,13 @@ sub grab_failed_primers {
         for my $type ( @{ $self->primer_types } ) {
             my $failed_primer_rs = $self->crispr->crispr_primers(
                 {
-                    primer_name  => $type,
-                    is_validated => 0,
+                    -and => [
+                        primer_name => $type,
+                        -or => [
+                            is_validated => 0,
+                            is_validated => undef,
+                        ],
+                    ],
                 }
             );
             $self->set_failed_primer( $failed_primer_rs, $type );
@@ -264,8 +269,13 @@ sub grab_failed_primers {
         for my $type ( @{ $self->primer_types } ) {
             my $failed_primer_rs = $self->design->genotyping_primers(
                 {
-                    genotyping_primer_type_id => $type,
-                    is_validated              => 0,
+                    -and => [
+                        genotyping_primer_type_id => $type,
+                        -or => [
+                            is_validated => 0,
+                            is_validated => undef,
+                        ],
+                    ],
                 }
             );
             $self->set_failed_primer( $failed_primer_rs, $type );
