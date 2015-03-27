@@ -6,6 +6,14 @@ LIMS2::Util::QcPrimers::Redesign
 
 =head1 DESCRIPTION
 
+Redesign failed primers for crisprs or designs.
+
+By default tells Primer3 to exclude regions to search for primers in, there regions
+will correspond to the location of the failed primers.
+
+If run with the poly_base_type option we will instead search for a string of PolyN bases
+( where N is the poly_base_type ) between the target region and the current failed primer.
+We can then only search for primers between the PolyN region and the target region.
 
 =cut
 
@@ -22,12 +30,20 @@ extends 'LIMS2::Util::QcPrimers';
 # Override attributes from parent LIMS2:Util::QcPrimers class
 #
 
-# overwrite ( we probably never want to overwrite, just mark original primer as rejected )
+=head2 overwrite
+
+We never want to overwrite, just mark original primers as rejected.
+
+=cut
 has '+overwrite' => (
     init_arg => undef,
 );
 
-# set this to true to always, we do not want to regenerate a already existing primer
+=head2 check_for_rejection
+
+Set this to true always, we do not want to regenerate a already existing primer
+
+=cut
 has '+check_for_rejection' => (
     init_arg => undef,
     default  => 1,
@@ -37,28 +53,58 @@ has '+check_for_rejection' => (
 # User Input
 #
 
+=head2 design
+
+Specify design resultset if we are working on design primers
+
+=cut
 has design => (
     is  => 'ro',
+    isa => 'LIMS2::Model::Schema::Result::Design',
 );
 
+=head2 crispr
+
+Specify a crispr resultset when we work in crispr primers.
+Can be a Crispr, CrisprPair or CrisprGroup resultset.
+
+=cut
 has crispr => (
     is  => 'ro',
+    isa => 'LIMS2::Model::Schema::Result',
 );
 
+=head2 target_type
+
+design or crispr type ( crispr, crispr_pair, crispr_group )
+
+=cut
 has target_type => (
-    is => 'ro',
+    is  => 'ro',
+    isa => 'Str',
 );
 
+=head2 primer_types
+
+Names of the failed primers.
+
+=cut
 has primer_types => (
     is       => 'ro',
     isa      => 'ArrayRef[Str]',
     required => 1,
 );
 
-# only for sequencing primers
+=head2 poly_base_type
+
+The base which has a Poly run ( A,C,T,G )
+Only for sequencing primers.
+Only works with crisprs currently.
+
+=cut
 has poly_base_type => (
     is  => 'ro',
-    isa => 'Str',
+    isa => subtype( 'Str' => where { $_ =~ /^[ACTG]$/i } ),
 );
 
 #
@@ -82,8 +128,12 @@ has primer3_task => (
     init_arg => undef,
 );
 
-# NOTE sequence_included_region will only ever take one value but we are keeping
-# it as a array to keep the code dealing with these values uniform
+=head2 sequence_regions
+
+Sequence_included_region will only ever take one value but we are keeping
+it as a array to keep the code dealing with these values uniform.
+
+=cut
 has [ 'sequence_included_region', 'sequence_excluded_regions' ] => (
     is       => 'rw',
     isa      => 'ArrayRef',
@@ -103,7 +153,7 @@ sub _build_ensembl_util {
 
 =head2 BUILD
 
-desc
+Carry out some pre-checks to make sure we have valid input.
 
 =cut
 sub BUILD {
@@ -131,7 +181,7 @@ sub BUILD {
 
 =head2 redesign_primers
 
-desc
+Redesign the failed primers for a target.
 
 =cut
 sub redesign_primers {
@@ -175,7 +225,10 @@ sub redesign_primers {
         );
     }
 
+    # Depending on the type of type of primers being produced we call different methods
+    # on the parent class to generate the primers
     my ( $primer_data, $seq );
+    ## no critic(ControlStructures::ProhibitCascadingIfElse)
     if ( $self->primer_project_name eq 'crispr_sequencing' ) {
         ( $primer_data, $seq ) = $self->crispr_sequencing_primers( $self->crispr );
     }
@@ -194,13 +247,16 @@ sub redesign_primers {
     else {
         die( "Not setup to redesign primers for primer project: " . $self->primer_project_name );
     }
+    ## use critic
 
     return( $primer_data, $seq );
 }
 
 =head2 process_primer_types
 
-desc
+Check the primer profile being used matches up the failed primer types.
+Work out the task we need to call with Primer3.
+Setup the parent class to only try to generate the primer we need redesiged.
 
 =cut
 sub process_primer_types {
@@ -241,12 +297,12 @@ sub process_primer_types {
 
 =head2 grab_failed_primers
 
-desc
+Grab the failed primers resultset objects from LIMS2.
 
 =cut
 sub grab_failed_primers {
     my ( $self ) = @_;
-    $self->log->debug('Grabbing failed primers..');
+    $self->log->debug('Grabbing failed primers');
 
     if ( $self->crispr ) {
         for my $type ( @{ $self->primer_types } ) {
@@ -287,7 +343,8 @@ sub grab_failed_primers {
 
 =head2 process_primer_name_sets
 
-desc
+Generate hash of primer type information to make looking
+up this information easier.
 
 =cut
 sub process_primer_name_sets {
@@ -319,7 +376,8 @@ sub process_primer_name_sets {
 
 =head2 set_failed_primer
 
-desc
+Store the failed primers in the failed_primers attribute.
+This is a hash keyed on primer types.
 
 =cut
 sub set_failed_primer {
@@ -336,6 +394,9 @@ sub set_failed_primer {
 }
 
 =head2 calculate_sequence_include_regions
+
+Calculate the sequence include region value we want to send to Primer3.
+This is based on the location of the PolyN sequence.
 
 ONLY FOR CRISPR PRIMERS FOR NOW
 
@@ -391,7 +452,8 @@ sub calculate_sequence_include_regions {
 
 =head2 calculate_sequence_exclude_regions
 
-desc
+Calculate the sequence excluded regions we want to send to Primer3.
+This is just a array of the failed primer genomic locations.
 
 =cut
 sub calculate_sequence_exclude_regions {
@@ -416,7 +478,9 @@ sub calculate_sequence_exclude_regions {
 
 =head2 find_poly_base_locations
 
-desc
+Grab the genomic sequence between the failed primer and the target region.
+Search this region for string of consecutive bases of poly_base_type. ( A,C,T or G )
+Return location of these Poly base regions.
 
 =cut
 sub find_poly_base_locations {
@@ -429,7 +493,7 @@ sub find_poly_base_locations {
     $self->log->debug("Searching for Poly $poly_base regions in $seq");
 
     my @poly_base_positions;
-    my $regex = qr/(($poly_base)(\2{5,}))/;
+    my $regex = qr/(($poly_base)(\2{5,}))/i;
     while ( $seq =~ /$regex/g ) {
         # make into genomic coordinates
         $self->log->debug( "Found Poly $poly_base region: $1" );
@@ -448,15 +512,16 @@ sub find_poly_base_locations {
 
 =head2 find_crispr_sequencing_primers
 
-desc
+Grab the current sequencing primers for a crispr.
+
+Currently this method returns the first non-rejected sequencing primer pair.
+If we don't have good PCR primers they should not have rejected the
+sequencing primers so we should be able to find some.
 
 =cut
 sub find_crispr_sequencing_primers {
     my ( $self ) = @_;
 
-    # Currently this method returns the first non-rejected sequencing primer pair
-    # if we don't have good PCR primers they should not have rejected the
-    # sequencing primers so we should be able to find some.
     my $sf1_primer = $self->crispr->current_primer( 'SF1' )->as_hash;
     my $sr1_primer = $self->crispr->current_primer( 'SR1' )->as_hash;
     my $start = $sf1_primer->{locus}{chr_start} + 1;
@@ -477,6 +542,12 @@ sub find_crispr_sequencing_primers {
     ];
 }
 
+=head2 around_get_new_params
+
+Insert additional values in the hash storing the parametesr for
+the primer generation.
+
+=cut
 around [
     qw( get_new_crispr_primer_finder_params
         get_new_crispr_PCR_primer_finder_params
