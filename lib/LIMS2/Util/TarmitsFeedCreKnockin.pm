@@ -2338,7 +2338,7 @@ my $sql_query_top =  <<"SQL_TOP_END";
 WITH project_requests AS (
 SELECT p.id AS project_id,
  p.htgt_project_id,
- p.sponsor_id,
+ ps.sponsor_id,
  p.gene_id,
  p.targeting_type,
  pa.allele_type,
@@ -2353,7 +2353,8 @@ SELECT p.id AS project_id,
 FROM projects p
 INNER JOIN project_alleles pa ON pa.project_id = p.id
 INNER JOIN cassette_function cf ON cf.id = pa.cassette_function
-WHERE p.sponsor_id   = '$sponsor_id'
+JOIN project_sponsors ps ON ps.project_id = p.id
+WHERE ps.sponsor_id   = '$sponsor_id'
 AND p.targeting_type = 'single_targeted'
 AND p.species_id     = '$species_id'
 SQL_TOP_END
