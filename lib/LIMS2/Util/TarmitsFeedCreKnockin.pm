@@ -1,7 +1,7 @@
 package LIMS2::Util::TarmitsFeedCreKnockin;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::TarmitsFeedCreKnockin::VERSION = '0.065';
+    $LIMS2::Util::TarmitsFeedCreKnockin::VERSION = '0.066';
 }
 ## use critic
 
@@ -2344,7 +2344,7 @@ my $sql_query_top =  <<"SQL_TOP_END";
 WITH project_requests AS (
 SELECT p.id AS project_id,
  p.htgt_project_id,
- p.sponsor_id,
+ ps.sponsor_id,
  p.gene_id,
  p.targeting_type,
  pa.allele_type,
@@ -2357,9 +2357,10 @@ SELECT p.id AS project_id,
  cf.well_has_cre,
  cf.well_has_no_recombinase
 FROM projects p
-INNER JOIN project_alleles pa ON pa.project_id = p.id
+INNER JOIN targeting_profile_alleles pa ON pa.targeting_profile_id = p.targeting_profile_id
 INNER JOIN cassette_function cf ON cf.id = pa.cassette_function
-WHERE p.sponsor_id   = '$sponsor_id'
+JOIN project_sponsors ps ON ps.project_id = p.id
+WHERE ps.sponsor_id   = '$sponsor_id'
 AND p.targeting_type = 'single_targeted'
 AND p.species_id     = '$species_id'
 SQL_TOP_END
