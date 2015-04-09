@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.066     2015-04-09 09:31:23 Europe/London
+
+  modified TarmitsFeedCreKnockin.pm to query new targeting_profile_alleles table (LIMS2 schema_version 88)
+
 0.065     2015-03-16 11:21:16 Europe/London
 
   added method to fetch list of primer names from QcPrimers
