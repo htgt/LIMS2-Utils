@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.067     2015-04-15 14:49:57 Europe/London
+
+  Add utility to redesign primers for designs and crisprs.
+
 0.066     2015-04-09 09:31:23 Europe/London
 
   modified TarmitsFeedCreKnockin.pm to query new targeting_profile_alleles table (LIMS2 schema_version 88)
