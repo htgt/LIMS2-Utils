@@ -22,16 +22,17 @@ my %WriteMakefileArgs = (
   },
   "DISTNAME" => "LIMS2-Util",
   "EXE_FILES" => [
+    "bin/tarmits_feed_wrapper.pl",
     "bin/fixture_data_bacs.pl",
     "bin/fixture_data_crisprs.pl",
     "bin/fixture_data_designs.pl",
     "bin/fixture_data_helper.pl",
     "bin/fixture_data_plate_wells.pl",
-    "bin/tarmits_feed_wrapper.pl",
+    "bin/post.sh",
+    "bin/update_gene_solr_index.pl",
     "bin/generate_crispr_group_genotyping_primers.pl",
     "bin/generate_fp_report_cache.pl",
-    "bin/post.sh",
-    "bin/update_gene_solr_index.pl"
+    "bin/redesign_primers.pl"
   ],
   "LICENSE" => "perl",
   "NAME" => "LIMS2::Util",
@@ -43,6 +44,7 @@ my %WriteMakefileArgs = (
     "Class::Data::Inheritable" => 0,
     "Config::Any" => 0,
     "Const::Fast" => 0,
+    "DDP" => 0,
     "Data::Dumper" => 0,
     "EngSeqBuilder" => 0,
     "File::Temp" => 0,
@@ -52,6 +54,7 @@ my %WriteMakefileArgs = (
     "HTTP::Request" => 0,
     "Hash::MoreUtils" => 0,
     "IO::File" => 0,
+    "IO::Handle" => 0,
     "IO::String" => 0,
     "IPC::Run" => 0,
     "Iterator::Simple" => 0,
@@ -88,10 +91,12 @@ my %WriteMakefileArgs = (
     "Sys::Hostname" => 0,
     "Template" => 0,
     "Template::Plugin" => 0,
+    "Text::CSV" => 0,
     "TraceServer" => 0,
     "Try::Tiny" => 0,
     "URI" => 0,
     "WWW::Mechanize" => 0,
+    "WebAppCommon::Util::EnsEMBL" => 0,
     "WebAppCommon::Util::FarmJobRunner" => 0,
     "YAML::Any" => 0,
     "base" => 0,
@@ -99,7 +104,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.066",
+  "VERSION" => "0.067",
   "test" => {
     "TESTS" => "t/*.t"
   }

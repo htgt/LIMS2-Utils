@@ -1,7 +1,7 @@
 package LIMS2::Util::QcPrimers;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::QcPrimers::VERSION = '0.066';
+    $LIMS2::Util::QcPrimers::VERSION = '0.067';
 }
 ## use critic
 
@@ -150,7 +150,7 @@ has check_for_rejection => (
 );
 
 has primer_name_sets => (
-    is      => 'ro',
+    is      => 'rw',
     isa     => 'ArrayRef',
     lazy_build => 1,
 );
@@ -301,7 +301,6 @@ input:
   strand
 
 =cut
-
 sub get_new_crispr_primer_finder_params {
     my ($self, $work_dir, $crispr_collection, $strand) = @_;
 
@@ -404,13 +403,43 @@ sub crispr_sequencing_primers {
     return ( $primer_data, $seq, $db_primers );
 }
 
+=head2 get_new_design_primer_finder_params
+
+Constructs the parameters required to create a new GeneratePrimersAttempts object
+targetting a given a design
+
+input:
+  working directory
+  design
+
+=cut
+sub get_new_design_primer_finder_params {
+    my ($self, $work_dir, $design ) = @_;
+
+    my @oligos = @{ $design->oligos_sorted || [] };
+
+    my $start_coord = $oligos[0]->{locus}->{chr_start};
+    my $end_coord = $oligos[-1]->{locus}->{chr_end};
+    my $strand = $oligos[0]->{locus}->{chr_strand};
+
+    $self->log->debug('Strand for design '.$design->id.": $strand");
+    return {
+        base_dir                    => $work_dir,
+        species                     => $design->species_id,
+        strand                      => $strand,
+        chromosome                  => $oligos[0]->{locus}->{chr_name},
+        target_start                => $start_coord,
+        target_end                  => $end_coord,
+        %{ $self->primer_params_from_config }
+    };
+}
+
 =head2 design_genotyping_primers
 
 For a Design fetch the design oligos and use min and max oligo positions
 as inputs to generate primers
 
 =cut
-
 sub design_genotyping_primers{
     my ($self, $design) = @_;
     $self->log->info( '====================' );
@@ -421,29 +450,13 @@ sub design_genotyping_primers{
 
     $self->log->info( 'Searching for Design Genotyping Primers' );
 
-    my @oligos = @{ $design->oligos_sorted || [] };
-
-    my $start_coord = $oligos[0]->{locus}->{chr_start};
-    my $end_coord = $oligos[-1]->{locus}->{chr_end};
-    my $strand = $oligos[0]->{locus}->{chr_strand};
-
-    $self->log->debug('Strand for design '.$design->id.": $strand");
-    my $params = {
-        base_dir                    => $work_dir,
-        species                     => $design->species_id,
-        strand                      => $strand,
-        chromosome                  => $oligos[0]->{locus}->{chr_name},
-        target_start                => $start_coord,
-        target_end                  => $end_coord,
-        %{ $self->primer_params_from_config }
-    };
-
+    my $params = $self->get_new_design_primer_finder_params($work_dir, $design );
     my ( $primer_data, $seq ) = $self->run_generate_primers_attempts($params);
 
     # For designs with genes on the reverse strand we need to reverse complement the primers
     # and store them such that the forward primer e.g. GF1, lies on the reverse strand
     # and the reverse primer, e.g. GR1, lies on the forward strand
-    if($strand == -1){
+    if($params->{strand} == -1){
         $self->log->debug("Reverse complementing primers for gene on reverse strand");
         foreach my $primer_group (@$primer_data){
             foreach my $primer_type (keys %$primer_group){
@@ -479,14 +492,46 @@ sub design_genotyping_primers{
     return ( $primer_data, $seq, $db_primers );
 }
 
+=head2 get_new_crispr_PCR_primer_finder_params
+
+Constructs the parameters required to create a new GeneratePrimersAttempts object
+targetting a given a design
+
+input:
+  working directory
+  crispr
+  crispr_primers
+
+=cut
+sub get_new_crispr_PCR_primer_finder_params {
+    my ($self, $work_dir, $crispr, $crispr_primers ) = @_;
+
+    my $target_start = $crispr_primers->[0]->{forward}->{oligo_start} + 1;
+    my $target_end =  $crispr_primers->[0]->{reverse}->{oligo_end} + 1;
+    $self->log->info("PCR Target start: $target_start");
+    $self->log->info("PCR Target end: $target_end");
+
+    return {
+        base_dir                    => $work_dir,
+        species                     => $crispr->species_id,
+        strand                      => 1,
+        chromosome                  => $crispr->chr_name,
+        target_start                => $target_start,
+        target_end                  => $target_end,
+        %{ $self->primer_params_from_config }
+    };
+}
+
 =head2 crispr_PCR_primers
+
+To generate PCR primers for a crispr we need its sequencing primers so we can find the
+target region.
 
 For a set of crispr primers use the oligo start and end positions of the 0 ranked primer pair
 as inputs to generate primers. Pass the crispr single/pair/group to this method too as
 we need this to get the species and chromosome.
 
 =cut
-
 sub crispr_PCR_primers{
     my ($self, $crispr_primers, $crispr) = @_;
     $self->log->info( '====================' );
@@ -497,23 +542,7 @@ sub crispr_PCR_primers{
 
     $self->log->info( 'Searching for Crispr PCR Primers' );
 
-    my $target_start = $crispr_primers->[0]->{forward}->{oligo_start} + 1;
-    my $target_end =  $crispr_primers->[0]->{reverse}->{oligo_end} + 1;
-    $self->log->info("PCR Target start: $target_start");
-    $self->log->info("PCR Target end: $target_end");
-
-    my $strand = 1;
-
-    my $params = {
-        base_dir                    => $work_dir,
-        species                     => $crispr->species_id,
-        strand                      => $strand,
-        chromosome                  => $crispr->chr_name,
-        target_start                => $target_start,
-        target_end                  => $target_end,
-        %{ $self->primer_params_from_config }
-    };
-
+    my $params = $self->get_new_crispr_PCR_primer_finder_params( $work_dir, $crispr, $crispr_primers );
     my ( $primer_data, $seq ) = $self->run_generate_primers_attempts($params);
 
     unless ( $primer_data ) {
@@ -677,11 +706,6 @@ sub _persist_primer_data{
             next unless exists $picked_primers->{$type};
             my $data = $picked_primers->{$type};
 
-            my $chr_strand = $type eq 'forward' ? 1 : -1;
-            if(defined $data->{oligo_strand_to_store}){
-                $chr_strand = $data->{oligo_strand_to_store};
-            }
-
             # Use oligo direction instead of primer type to determine
             # strandedness in case we have reversed the primer orientation
             # for design genotyping primers for gene on reverse strand
@@ -718,7 +742,6 @@ sub _persist_primer_data{
     return array ref of field names to use as column headings in output
 
 =cut
-
 sub get_output_headings {
     return shift->output_headings;
 }
@@ -729,7 +752,6 @@ sub get_output_headings {
    requires a primer_data arrayref as input
 
 =cut
-
 sub get_output_values{
     my ($self, $primer_data) = @_;
     my $values;

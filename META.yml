@@ -24,6 +24,7 @@ requires:
   Class::Data::Inheritable: 0
   Config::Any: 0
   Const::Fast: 0
+  DDP: 0
   Data::Dumper: 0
   EngSeqBuilder: 0
   File::Temp: 0
@@ -33,6 +34,7 @@ requires:
   HTTP::Request: 0
   Hash::MoreUtils: 0
   IO::File: 0
+  IO::Handle: 0
   IO::String: 0
   IPC::Run: 0
   Iterator::Simple: 0
@@ -69,14 +71,16 @@ requires:
   Sys::Hostname: 0
   Template: 0
   Template::Plugin: 0
+  Text::CSV: 0
   TraceServer: 0
   Try::Tiny: 0
   URI: 0
   WWW::Mechanize: 0
+  WebAppCommon::Util::EnsEMBL: 0
   WebAppCommon::Util::FarmJobRunner: 0
   YAML::Any: 0
   base: 0
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.066
+version: 0.067
