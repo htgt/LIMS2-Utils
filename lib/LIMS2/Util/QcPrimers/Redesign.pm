@@ -18,6 +18,7 @@ We can then only search for primers between the PolyN region and the target regi
 =cut
 
 use Moose;
+use Moose::Util::TypeConstraints;
 use WebAppCommon::Util::EnsEMBL;
 use DDP;
 use LIMS2::Exception;
@@ -71,7 +72,6 @@ Can be a Crispr, CrisprPair or CrisprGroup resultset.
 =cut
 has crispr => (
     is  => 'ro',
-    isa => 'LIMS2::Model::Schema::Result',
 );
 
 =head2 target_type
