@@ -366,7 +366,7 @@ Generate a pair of primers for a given crispr single or pair.
 sub crispr_sequencing_primers {
     my ( $self, $crispr_single_or_pair ) = @_;
     $self->log->info( '====================' );
-    $self->log->info( "GENERATE PRIMERS for $crispr_single_or_pair, gene_id: " . $crispr_single_or_pair->gene_id );
+    $self->log->info( "GENERATE PRIMERS for $crispr_single_or_pair" );
 
     my $work_dir = $self->base_dir->subdir( 'crispr_sequencing_' . $crispr_single_or_pair->id )->absolute;
     $work_dir->mkpath;
