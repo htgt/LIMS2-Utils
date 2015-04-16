@@ -3,6 +3,7 @@ use strict;
 use warnings FATAL => 'all';
 
 use LIMS2::Util::QcPrimers::Redesign;
+use LIMS2::Model::Util::Crisprs qw( gene_ids_for_crispr );
 use LIMS2::Model;
 use Getopt::Long;
 use Log::Log4perl ':easy';
@@ -40,6 +41,7 @@ pod2usage('Must specify a work dir --dir') unless $dir_name;
 my $base_dir = dir( $dir_name )->absolute;
 $base_dir->mkpath;
 my $model = LIMS2::Model->new( user => 'tasks' );
+my $gene_finder =  sub { $model->find_genes( @_ ) };
 
 my @TARGET_COLUMN_HEADERS = qw(
 gene_id
@@ -171,6 +173,7 @@ sub process_redesign_file {
 }
 ## use critic
 
+
 =head2 dump_output
 
 Write out the generated primers plus other useful information in YAML format.
@@ -189,9 +192,10 @@ sub dump_output {
     $output_data{gene_name}           = $gene_name;
 
     if ( my $crispr = $params->{crispr} ) {
+        my $gene_ids = gene_ids_for_crispr( $gene_finder, $crispr );
         my $target_type = $params->{target_type};
         $output_data{ $target_type . '_id'} = $crispr->id;
-        $output_data{gene_id}   = $crispr->gene_id;
+        $output_data{gene_id}   = join( '|', @{ $gene_ids } );
         $output_data{species}   = $crispr->species_id;
         $output_data{chromosome} = $crispr->chr_name;
     }

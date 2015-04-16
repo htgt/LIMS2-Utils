@@ -63,6 +63,7 @@ my %WriteMakefileArgs = (
     "LIMS2::Model" => 0,
     "LIMS2::Model::Constants" => 0,
     "LIMS2::Model::DBConnect" => 0,
+    "LIMS2::Model::Util::Crisprs" => 0,
     "LIMS2::Model::Util::DesignInfo" => 0,
     "LIMS2::Model::Util::DesignTargets" => 0,
     "LIMS2::Model::Util::EngSeqParams" => 0,
@@ -104,7 +105,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.067",
+  "VERSION" => "0.068",
   "test" => {
     "TESTS" => "t/*.t"
   }

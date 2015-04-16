@@ -43,6 +43,7 @@ requires:
   LIMS2::Model: 0
   LIMS2::Model::Constants: 0
   LIMS2::Model::DBConnect: 0
+  LIMS2::Model::Util::Crisprs: 0
   LIMS2::Model::Util::DesignInfo: 0
   LIMS2::Model::Util::DesignTargets: 0
   LIMS2::Model::Util::EngSeqParams: 0
@@ -83,4 +84,4 @@ requires:
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.067
+version: 0.068

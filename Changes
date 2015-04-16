@@ -1,3 +1,7 @@
+0.068     2015-04-16 09:29:23 Europe/London
+
+  Bugfix, gene_id can not longer be called on crispr or crispr pair resultsets
+
 0.067     2015-04-15 14:49:57 Europe/London
 
   Add utility to redesign primers for designs and crisprs.

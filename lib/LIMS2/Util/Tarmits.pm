@@ -1,7 +1,7 @@
 package LIMS2::Util::Tarmits;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::Tarmits::VERSION = '0.067';
+    $LIMS2::Util::Tarmits::VERSION = '0.068';
 }
 ## use critic
 
