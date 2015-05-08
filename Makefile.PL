@@ -32,7 +32,8 @@ my %WriteMakefileArgs = (
     "bin/update_gene_solr_index.pl",
     "bin/generate_crispr_group_genotyping_primers.pl",
     "bin/generate_fp_report_cache.pl",
-    "bin/redesign_primers.pl"
+    "bin/redesign_primers.pl",
+    "bin/get_trace.pl"
   ],
   "LICENSE" => "perl",
   "NAME" => "LIMS2::Util",
@@ -105,7 +106,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.068",
+  "VERSION" => "0.069",
   "test" => {
     "TESTS" => "t/*.t"
   }
