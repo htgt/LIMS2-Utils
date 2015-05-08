@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.069     2015-05-08 12:56:47 Europe/London
+
+  Bugfixes, fix errors in crispr import from WGE
+
 0.068     2015-04-16 09:29:23 Europe/London
 
   Bugfix, gene_id can not longer be called on crispr or crispr pair resultsets
