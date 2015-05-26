@@ -237,7 +237,7 @@ redesign_primers.pl - redesign failed primers for crisprs or designs
       --debug                     Debug output
       --verbose                   Verbose output
       --dir                       Name of work directory
-      --failed-primer-types       Name of failed primers ( can specify up to 2 )
+      --failed-primer-type        Name of failed primers ( can specify up to 2 )
       --crispr-group-id           ID of crispr group
       --crispr-pair-id            ID of crispr pair
       --crispr-id                 ID of single crispr
