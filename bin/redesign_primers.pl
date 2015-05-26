@@ -106,7 +106,7 @@ else {
         $params{target_type} = 'crispr_group';
     }
     elsif ( $design_id ) {
-        $params{design} = $model->retrieve_design( { id => $design_id } );
+        $params{design} = $model->c_retrieve_design( { id => $design_id } );
         $params{target_type} = 'design';
     }
     else {
@@ -174,11 +174,8 @@ sub process_redesign_file {
 ## use critic
 
 
-=head2 dump_output
 
-Write out the generated primers plus other useful information in YAML format.
-
-=cut
+#Write out the generated primers plus other useful information in YAML format.
 sub dump_output {
     my ( $picked_primers, $params, $gene_name, $primer_util ) = @_;
 
@@ -242,10 +239,10 @@ redesign_primers.pl - redesign failed primers for crisprs or designs
       --crispr-pair-id            ID of crispr pair
       --crispr-id                 ID of single crispr
       --design-id                 Design ID
-      --redesign-file             File with primer redesign details
+      --redesign-file             CSV file with primer redesign details
       --persist-primers           Persist the generated primers to LIMS2
       --project-name              Name of project we are generating primers for
-      --poly                      Is primer being redesign because of PolyN bases
+      --poly                      Poly bases, specify A,T,C or G
 
 By default the primers will not be persisted to LIMS2.
 
@@ -253,6 +250,27 @@ By default the primers will not be persisted to LIMS2.
 
 Redesign failing primers for crisprs or designs, marked the failed primers as rejected
 and stores the new primers in LIMS2.
+
+If you specify a csv redesign file ( --redesign-file ) the following columns are allowed.
+Items marked with * are optional but you must specify either crispr_id, crispr_pair_id, crispr_group_id or design_id.
+
+=over
+
+=item failed_primer_types
+
+=item primer_project_name
+
+=item poly*
+
+=item crispr_id*
+
+=item crispr_pair_id*
+
+=item crispr_group_id*
+
+=item design_id*
+
+=back
 
 Currently the valid primer project names are:
 
