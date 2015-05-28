@@ -173,9 +173,7 @@ sub process_redesign_file {
 }
 ## use critic
 
-
-
-#Write out the generated primers plus other useful information in YAML format.
+#Write out the generated primers plus other useful information in CSV format.
 sub dump_output {
     my ( $picked_primers, $params, $gene_name, $primer_util ) = @_;
 
