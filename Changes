@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.070     2015-06-10 15:21:05 Europe/London
+
+   Added Human Genetics sponsor to front page caching
+
 0.069     2015-05-08 12:56:47 Europe/London
 
   Bugfixes, fix errors in crispr import from WGE
