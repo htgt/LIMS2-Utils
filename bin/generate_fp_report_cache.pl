@@ -66,6 +66,7 @@ my @human_link_names = (
     'Pathogen',
     'Stem Cell Engineering',
     'Transfacs',
+    'Human Genetics',
 );
 
 my @mouse_link_names = (
