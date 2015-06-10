@@ -1,7 +1,7 @@
 package LIMS2::Util::WGE;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::WGE::VERSION = '0.059';
+    $LIMS2::Util::WGE::VERSION = '0.070';
 }
 ## use critic
 
@@ -83,10 +83,11 @@ sub get_crispr {
     LIMS2::Exception::Validation->throw( "Crispr is on $crispr_assembly assembly, current LIMS2 assembly for $species: $assembly" )
         unless $assembly eq $crispr_assembly;
 
+    my $type = $wge_crispr->{exonic} ? 'Exonic' : $wge_crispr->{genic} ? 'Intergenic' : 'Intronic';
     my $crispr = {
         species => $crispr_species,
-        off_target_algorithm => 'bwa',
-        type                 => 'Exonic',
+        off_target_algorithm => 'exhaustive',
+        type                 => $type,
         wge_crispr_id        => $wge_crispr->{id},
         locus                => {
             chr_name   => $wge_crispr->{chr_name},

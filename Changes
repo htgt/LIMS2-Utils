@@ -1,3 +1,47 @@
+0.070     2015-06-10 15:21:05 Europe/London
+
+   Added Human Genetics sponsor to front page caching
+
+0.069     2015-05-08 12:56:47 Europe/London
+
+  Bugfixes, fix errors in crispr import from WGE
+
+0.068     2015-04-16 09:29:23 Europe/London
+
+  Bugfix, gene_id can not longer be called on crispr or crispr pair resultsets
+
+0.067     2015-04-15 14:49:57 Europe/London
+
+  Add utility to redesign primers for designs and crisprs.
+
+0.066     2015-04-09 09:31:23 Europe/London
+
+  modified TarmitsFeedCreKnockin.pm to query new targeting_profile_alleles table (LIMS2 schema_version 88)
+
+0.065     2015-03-16 11:21:16 Europe/London
+
+  added method to fetch list of primer names from QcPrimers
+
+0.064     2015-03-02 15:57:13 Europe/London
+
+  location of primer generation config files changed
+
+0.063     2015-02-25 13:52:34 Europe/London
+
+   primer generation extended to support more targets
+
+0.062     2015-02-19 17:21:06 Europe/London
+
+    update_gene_solr_index script updated to include chromosome, crispr data removed
+
+0.061     2015-02-19 16:43:45 Europe/London
+
+    data deletion from genotyping primers hash
+
+0.060     2015-02-18 13:18:05 Europe/London
+
+    generate_fp_report_cache modified to default for full report
+
 0.059     2015-01-21 16:33:02 Europe/London
 
    trying at the cached fp reports to localy fiz the multiple slashes when on staging, again
