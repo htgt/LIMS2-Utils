@@ -544,7 +544,7 @@ sub find_crispr_sequencing_primers {
 
 =head2 around_get_new_params
 
-Insert additional values in the hash storing the parametesr for
+Insert additional values in the hash storing the parameters for
 the primer generation.
 
 =cut
