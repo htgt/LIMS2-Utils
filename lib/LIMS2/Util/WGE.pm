@@ -77,7 +77,8 @@ sub get_crispr {
     LIMS2::Exception::Validation->throw( "Crispr is on $crispr_assembly assembly, current LIMS2 assembly for $species: $assembly" )
         unless $assembly eq $crispr_assembly;
 
-    my $type = $wge_crispr->{exonic} ? 'Exonic' : $wge_crispr->{genic} ? 'Intergenic' : 'Intronic';
+    my $type = $wge_crispr->{exonic} ? 'Exonic' : $wge_crispr->{genic} ? 'Intronic' : 'Intergenic';
+
     my $crispr = {
         species => $crispr_species,
         off_target_algorithm => 'exhaustive',
