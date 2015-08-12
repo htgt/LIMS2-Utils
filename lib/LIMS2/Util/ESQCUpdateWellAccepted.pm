@@ -1,7 +1,7 @@
 package LIMS2::Util::ESQCUpdateWellAccepted;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::ESQCUpdateWellAccepted::VERSION = '0.072';
+    $LIMS2::Util::ESQCUpdateWellAccepted::VERSION = '0.073';
 }
 ## use critic
 

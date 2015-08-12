@@ -1,3 +1,7 @@
+0.073     2015-08-12 13:28:29 Europe/London
+
+    Updated front page caching to cache wide sub reports
+
 0.072     2015-07-22 10:27:45 Europe/London
 
     Front page cached report timeout fixed and mouse dt projects added.
