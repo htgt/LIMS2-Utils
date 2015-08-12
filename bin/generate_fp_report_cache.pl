@@ -115,7 +115,9 @@ sub cache_reports {
     foreach my $name ( @link_names ) {
         my $sub_r = $mech->get( $front_page_url{$species} );
         INFO 'Fetching sub level ' . $name . ' report for ' . $species . ' ...';
-        $sub_r = $mech->follow_link( url_regex => qr/$name/ );
+        my $top_link = $mech->find_link( url_regex => qr/$name/ )->url;
+        $top_link =~ s/\?/\?generate_cache=1\&/;
+        $sub_r = $mech->get( $top_link );
         server_responder( $sub_r );
         cache_sub_page_full( $mech, $name );
         cache_sub_page_simple( $mech, $name );
@@ -185,7 +187,9 @@ sub cache_sub_page_simple {
 
     INFO "...caching sub page $species simple report";
 
-    my $r = $mech->follow_link( url_regex => qr/type=simple/ );
+    my $simple_link = $mech->find_link( url_regex => qr/type=simple/ )->url;
+    $simple_link =~ s/\?/\?generate_cache=1\&/;
+    my $r = $mech->get( $simple_link );
     server_responder( $r );
 
     my $content = $mech->content();
