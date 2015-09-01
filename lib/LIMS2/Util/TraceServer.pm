@@ -54,11 +54,11 @@ sub get_trace {
     my $uri = $self->traceserver_uri."get_trace/$name.scf";
     $self->log->debug("getting trace from $uri");
     my $response = $self->user_agent->get($uri);
-    
+
     if($response->is_success){
         return $response->content;
     }
-    
+
     die "Could not get trace for read $name from $uri - ".$response->status_line;
 }
 
