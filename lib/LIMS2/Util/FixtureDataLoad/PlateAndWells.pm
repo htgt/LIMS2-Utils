@@ -557,6 +557,8 @@ sub create_process_aux_data_crispr_ep{
 
     $process_data->{cell_line} = $process->cell_line->name;
     $process_data->{nuclease} = $process->nuclease->name;
+
+    return;
 }
 
 sub find_parent_wells {
