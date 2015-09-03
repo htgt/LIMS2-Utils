@@ -124,6 +124,9 @@ sub _build_process_aux_data_dispatches {
         'freeze'                 => sub { $self->create_process_aux_data_freeze( @_ ) },
         'xep_pool'               => sub { $self->create_process_aux_data_xep_pool( @_ ) },
         'dist_qc'                => sub { $self->create_process_aux_data_dist_qc( @_ ) },
+        'crispr_vector'          => sub { $self->create_process_aux_data_crispr_vector( @_ )},
+        'paired_crispr_assembly' => sub { $self->create_process_aux_data_paired_crispr_assembly( @_ )},
+        'crispr_ep'              => sub { $self->create_process_aux_data_crispr_ep( @_ )},
     );
 
     return \%process_aux_data_dispatches;
@@ -251,6 +254,10 @@ sub build_plate_data {
         species     => $plate->species_id,
         is_virtual  => $plate->is_virtual ? 1 : 0,
     );
+
+    if($plate->type_id eq 'CRISPR'){
+        $plate_data{appends} = $plate->crispr_plate_append->append_id;
+    }
 
     return \%plate_data;
 }
@@ -409,6 +416,17 @@ sub create_process_aux_data_3w_gateway{
     return;
 }
 
+sub create_process_aux_data_crispr_vector{
+    my ( $self, $well, $process_data ) = @_;
+    $self->log->debug('crispr_vector');
+
+    my $process = $well->output_processes->first;
+    $process_data->{backbone} = $process->process_backbone->backbone->name;
+
+    # no aux data
+    return;
+}
+
 sub create_process_aux_data_legacy_gateway {
     my ( $self, $well, $process_data ) = @_;
     $self->log->debug('legacy_gateway well');
@@ -525,6 +543,21 @@ sub create_process_aux_data_dist_qc{
     my ( $self, $well, $process_data ) = @_;
 
     # no aux data
+    return;
+}
+
+sub create_process_aux_data_paired_crispr_assembly{
+    return;
+}
+
+sub create_process_aux_data_crispr_ep{
+    my ( $self, $well, $process_data ) = @_;
+
+    my $process = $well->output_processes->first;
+
+    $process_data->{cell_line} = $process->cell_line->name;
+    $process_data->{nuclease} = $process->nuclease->name;
+
     return;
 }
 
