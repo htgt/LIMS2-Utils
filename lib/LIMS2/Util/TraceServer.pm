@@ -1,7 +1,7 @@
 package LIMS2::Util::TraceServer;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::TraceServer::VERSION = '0.069';
+    $LIMS2::Util::TraceServer::VERSION = '0.074';
 }
 ## use critic
 
@@ -11,9 +11,9 @@ use warnings;
 
 use Moose;
 
-use TraceServer;
 use Try::Tiny;
 use File::Temp;
+use LWP::UserAgent;
 
 use Log::Log4perl qw(:easy);
 
@@ -26,30 +26,22 @@ BEGIN {
     }
 }
 
-has traceserver => (
+has traceserver_uri => (
     is => 'ro',
-    isa => 'TraceServer',
+    isa => 'Str',
     lazy_build => 1,
 );
 
-sub _build_traceserver {
-    my $self = shift;
-
-    my $ts;
-    try {
-        $ts = TraceServer->new
-    }
-    catch {
-        die "Could not load TraceServer: $_";
-    };
-
-    #oracle stuff breaks the sig int handler, reset it here
-    ## no critic(RequireLocalizedPunctuationVars)
-    $SIG{INT} = 'DEFAULT';
-    ## use critic
-
-    return $ts;
+sub _build_traceserver_uri {
+    my $uri = $ENV{TRACE_SERVER_URI} || 'http://si-trace-web.internal.sanger.ac.uk:8888/';
+    return $uri;
 }
+
+has user_agent => (
+    is => 'ro',
+    isa => 'LWP::UserAgent',
+    default => sub { LWP::UserAgent->new() },
+);
 
 has format => (
     is      => 'rw',
@@ -65,24 +57,17 @@ Given a trace name return the binary SCF data in a string
 sub get_trace {
     my ( $self, $name ) = @_;
 
-    return $self->_get_trace( $name )->get_data( $self->format );
+    my $uri = $self->traceserver_uri."get_trace/$name.scf";
+    $self->log->debug("getting trace from $uri");
+    my $response = $self->user_agent->get($uri);
+
+    if($response->is_success){
+        return $response->content;
+    }
+
+    die "Could not get trace for read $name from $uri - ".$response->status_line;
 }
 
-=item _get_trace
-
-Get a TraceServer::Trace object given a read name
-
-=cut
-sub _get_trace {
-    my ( $self, $name ) = @_;
-
-    die "read $name doesn't exist" unless $self->traceserver->read_exists( $name );
-
-    my $read = $self->traceserver->get_read_by_name( $name );
-    my $trace = $read->get_trace;
-
-    return $trace;
-}
 
 sub write_temp_file {
     my ( $self, $trace_data ) = @_;
@@ -123,10 +108,10 @@ LIMS2::Util::TraceServer
 
 =head1 DESCRIPTION
 
-Helper module for using the TraceServer perl wrapper. TraceServer.pm must be in your perl5lib (it sits inside the oracle installation in /software for some reason)
+Helper module for retrieving traces from Sanger's Internal Trace Server http server
 
 =head1 AUTHOR
 
-Alex Hodgkins
+Alex Hodgkins, Anna Farne
 
 =cut

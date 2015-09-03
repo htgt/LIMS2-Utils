@@ -4,6 +4,7 @@ MANIFEST
 META.yml
 Makefile.PL
 README
+README.md
 bin/fixture_data_bacs.pl
 bin/fixture_data_crisprs.pl
 bin/fixture_data_designs.pl

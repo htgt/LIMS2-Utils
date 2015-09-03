@@ -22,18 +22,18 @@ my %WriteMakefileArgs = (
   },
   "DISTNAME" => "LIMS2-Util",
   "EXE_FILES" => [
-    "bin/tarmits_feed_wrapper.pl",
     "bin/fixture_data_bacs.pl",
     "bin/fixture_data_crisprs.pl",
     "bin/fixture_data_designs.pl",
     "bin/fixture_data_helper.pl",
     "bin/fixture_data_plate_wells.pl",
-    "bin/post.sh",
-    "bin/update_gene_solr_index.pl",
+    "bin/tarmits_feed_wrapper.pl",
     "bin/generate_crispr_group_genotyping_primers.pl",
     "bin/generate_fp_report_cache.pl",
-    "bin/redesign_primers.pl",
-    "bin/get_trace.pl"
+    "bin/post.sh",
+    "bin/update_gene_solr_index.pl",
+    "bin/get_trace.pl",
+    "bin/redesign_primers.pl"
   ],
   "LICENSE" => "perl",
   "NAME" => "LIMS2::Util",
@@ -94,7 +94,6 @@ my %WriteMakefileArgs = (
     "Template" => 0,
     "Template::Plugin" => 0,
     "Text::CSV" => 0,
-    "TraceServer" => 0,
     "Try::Tiny" => 0,
     "URI" => 0,
     "WWW::Mechanize" => 0,
@@ -106,7 +105,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.069",
+  "VERSION" => "0.074",
   "test" => {
     "TESTS" => "t/*.t"
   }

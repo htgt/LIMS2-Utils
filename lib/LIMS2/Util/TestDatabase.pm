@@ -1,7 +1,7 @@
 package LIMS2::Util::TestDatabase;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::TestDatabase::VERSION = '0.069';
+    $LIMS2::Util::TestDatabase::VERSION = '0.074';
 }
 ## use critic
 
@@ -166,7 +166,6 @@ well_lab_number              => 'wellLabNumber',
 wells                        => 'Well',
 plate_comments               => 'PlateComment',
 plates                       => 'Plate',
-project_alleles              => 'ProjectAllele',
 projects                     => 'Project',
 user_preferences             => 'UserPreference',
 user_role                    => 'UserRole',

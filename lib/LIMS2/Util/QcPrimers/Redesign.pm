@@ -1,7 +1,7 @@
 package LIMS2::Util::QcPrimers::Redesign;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::QcPrimers::Redesign::VERSION = '0.069';
+    $LIMS2::Util::QcPrimers::Redesign::VERSION = '0.074';
 }
 ## use critic
 
@@ -550,7 +550,7 @@ sub find_crispr_sequencing_primers {
 
 =head2 around_get_new_params
 
-Insert additional values in the hash storing the parametesr for
+Insert additional values in the hash storing the parameters for
 the primer generation.
 
 =cut

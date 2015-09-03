@@ -49,8 +49,9 @@ my $report_name_trailer = '.html';
 my $report_name_trailer_simple = '_simple.html';
 my $csv_name_trailer = '.csv';
 my %front_page_url = (
-    'human' => ("$base_path/public_reports/sponsor_report?generate_cache=1&species=Human"),
-    'mouse' => ("$base_path/public_reports/sponsor_report?generate_cache=1&species=Mouse"),
+    'human'    => ("$base_path/public_reports/sponsor_report?generate_cache=1&species=Human"),
+    'mouse'    => ("$base_path/public_reports/sponsor_report?generate_cache=1&species=Mouse"),
+    'mouse_dt' => ("$base_path/public_reports/sponsor_report/double_targeted?generate_cache=1&species=Mouse"),
 );
 
 # Write an html cache of the front page sub-reports
@@ -66,6 +67,7 @@ my @human_link_names = (
     'Pathogen',
     'Stem Cell Engineering',
     'Transfacs',
+    'Human Genetics',
 );
 
 my @mouse_link_names = (
@@ -78,12 +80,20 @@ my @mouse_link_names = (
     'Pathogen Group 3',
 );
 
+my @mouse_dt_link_names = (
+    'Core',
+    'Pathogens',
+    'Syboss'
+);
+
 INFO 'Generating front page report cache...';
 INFO 'Using Human URL: ' . $front_page_url{'human'};
-INFO 'Using Mouse URL: ' . $front_page_url{'mouse'};
+INFO 'Using Mouse single targeted URL: ' . $front_page_url{'mouse'};
+INFO 'Using Mouse double targeted URL: ' . $front_page_url{'mouse_dt'};
 
 cache_reports( 'human', @human_link_names);
 cache_reports( 'mouse', @mouse_link_names);
+cache_reports( 'mouse_dt', @mouse_dt_link_names);
 
 INFO 'Completed cache generation for front page reports';
 
@@ -95,7 +105,7 @@ sub cache_reports {
     my $species = shift;
     my @link_names = @_;
 
-    my $mech = WWW::Mechanize->new();
+    my $mech = WWW::Mechanize->new( timeout => 600 );
 
     INFO 'Fetch top level ' . $species . ' page...';
     my $top_r = $mech->get( $front_page_url{$species} );
@@ -105,7 +115,9 @@ sub cache_reports {
     foreach my $name ( @link_names ) {
         my $sub_r = $mech->get( $front_page_url{$species} );
         INFO 'Fetching sub level ' . $name . ' report for ' . $species . ' ...';
-        $sub_r = $mech->follow_link( url_regex => qr/$name/ );
+        my $top_link = $mech->find_link( url_regex => qr/$name/ )->url;
+        $top_link =~ s/\?/\?generate_cache=1\&/;
+        $sub_r = $mech->get( $top_link );
         server_responder( $sub_r );
         cache_sub_page_full( $mech, $name );
         cache_sub_page_simple( $mech, $name );
@@ -127,7 +139,7 @@ sub cache_front_page {
     $content =~ s/(?<=[^:])\/\/+/\//g;
 
     my $report_file_name = report_file( $species );
-    INFO 'Writing html for front page' . $species . ' to ' . $report_file_name;
+    INFO 'Writing html for front page ' . $species . ' to ' . $report_file_name;
     open( my $html_file_h, ">:encoding(UTF-8)", $report_file_name )
         or die ERROR "Unable to open $report_file_name: $!";
     print $html_file_h $content;
@@ -145,6 +157,8 @@ sub cache_front_page {
 sub cache_sub_page_full {
     my $mech = shift;
     my $species = shift;
+
+    INFO "...caching sub page $species full report";
 
     my $content = $mech->content();
     $content =~ s/sponsor_report\/[^\/]+\/([^\/]+)\/Genes[^>]*type=simple/cached_sponsor_report_simple\/$1/g;
@@ -171,7 +185,11 @@ sub cache_sub_page_simple {
     my $mech = shift;
     my $species = shift;
 
-    my $r = $mech->follow_link( url_regex => qr/type=simple/ );
+    INFO "...caching sub page $species simple report";
+
+    my $simple_link = $mech->find_link( url_regex => qr/type=simple/ )->url;
+    $simple_link =~ s/\?/\?generate_cache=1\&/;
+    my $r = $mech->get( $simple_link );
     server_responder( $r );
 
     my $content = $mech->content();
@@ -200,7 +218,8 @@ sub cache_csv_content {
     my $mech = shift;
     my $name = shift;
 
-    INFO 'Generating csv for ' . $name . ' report';
+    INFO '...generating csv for ' . $name . ' report';
+
     my $r = $mech->follow_link( url_regex => qr/csv=1/ );
     server_responder( $r );
 
