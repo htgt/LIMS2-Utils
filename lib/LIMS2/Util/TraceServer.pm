@@ -8,6 +8,7 @@ use Moose;
 use Try::Tiny;
 use File::Temp;
 use LWP::UserAgent;
+use Path::Class;
 
 use Log::Log4perl qw(:easy);
 
@@ -18,6 +19,30 @@ BEGIN {
     unless ( Log::Log4perl->initialized ) {
         Log::Log4perl->easy_init( { level => $DEBUG } );
     }
+}
+
+has fileserver_uri => (
+    is => 'ro',
+    isa => 'Str',
+    lazy_build => 1,
+);
+
+sub _build_fileserver_uri {
+    my $uri = $ENV{FILE_API_URL}
+        or die "FILE_API_URL environment variable not set";
+    return $uri;
+}
+
+has lims2_seq_dir => (
+    is => 'ro',
+    isa => 'Path::Class::Dir',
+    lazy_build => 1,
+);
+
+sub _build_lims2_seq_dir {
+    my $dir = dir( $ENV{LIMS2_SEQ_FILE_DIR} )
+        or die "LIMS2_SEQ_FILE_DIR environment variable not set or not a directory";
+    return $dir;
 }
 
 has traceserver_uri => (
@@ -50,6 +75,20 @@ Given a trace name return the binary SCF data in a string
 =cut
 sub get_trace {
     my ( $self, $name ) = @_;
+
+    my ($project_name) = ( $name =~ /^(\w*)[a-zA-Z]\d\d\..*/g );
+    $project_name =~ s/_\d$//g;
+
+    my $scf_path = $self->lims2_seq_dir->subdir($project_name)->file($name.".scf")->stringify;
+    my $lims2_scf_uri = $self->fileserver_uri.$scf_path;
+    $self->log->debug("getting trace from uri $lims2_scf_uri");
+    my $fileserver_response = $self->user_agent->get($lims2_scf_uri);
+    if($fileserver_response->is_success){
+        return $fileserver_response->content;
+    }
+    else{
+        $self->log->debug("could not get scf from $lims2_scf_uri. trying traceserver");
+    }
 
     my $uri = $self->traceserver_uri."get_trace/$name.scf";
     $self->log->debug("getting trace from $uri");
