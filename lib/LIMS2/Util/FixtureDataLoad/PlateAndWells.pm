@@ -216,9 +216,59 @@ sub copy_well_to_destination_db {
     }
 
     $self->log->info( "Process $well_orig_process_type, plate type $well_orig_plate_type");
-    $well_orig = $self->create_well_in_destination_db( $well_orig, $well_data );
+    my $well_new = $self->create_well_in_destination_db( $well_orig, $well_data );
 
-    return $well_orig;
+    $self->log->info("Checking for related Crispr ES QC results");
+    # check for crispr_es_qc_wells and import
+    my $crispr_qc_run_data = {};
+    my @crispr_qc_well_data;
+    foreach my $crispr_qc_well ($well_orig->crispr_es_qc_wells){
+        my $run_id = $crispr_qc_well->crispr_es_qc_run_id;
+        my $qc_well_data = {
+            well_id  => $well_new->id,
+            fwd_read => $crispr_qc_well->fwd_read,
+            rev_read => $crispr_qc_well->rev_read,
+            crispr_chr_name => $crispr_qc_well->crispr_chr->name,
+            crispr_start    => $crispr_qc_well->crispr_start,
+            crispr_end      => $crispr_qc_well->crispr_end,
+            analysis_data   => $crispr_qc_well->analysis_data,
+            vcf_file        => $crispr_qc_well->vcf_file,
+            crispr_es_qc_run_id => $run_id,
+            species             => $crispr_qc_well->well->plate->species_id,
+            crispr_damage_type  => $crispr_qc_well->crispr_damage_type_id,
+            variant_size        => $crispr_qc_well->variant_size,
+            accepted            => $crispr_qc_well->accepted,
+        };
+        # FIXME: do we need related CrisprValidations?
+
+        push @crispr_qc_well_data, $qc_well_data;
+
+        unless(exists $crispr_qc_run_data->{ $run_id }){
+            my $run = $crispr_qc_well->crispr_es_qc_run;
+            my $run_data = {
+                id         => $run->id,
+                created_by => $run->created_by->name,
+                species    => $run->species_id,
+                sequencing_project => $run->sequencing_project,
+                sub_project => $run->sub_project,
+            };
+            $crispr_qc_run_data->{ $run_id } = $run_data;
+            $self->find_or_create_user($run->created_by);
+        }
+    }
+
+    foreach my $run_data(values %{ $crispr_qc_run_data }){
+        $self->log->debug("Creating ES QC run ".$run_data->{id});
+        my $run = $self->dest_model->create_crispr_es_qc_run($run_data) or die $!;
+    }
+
+    foreach my $qc_well_data(@crispr_qc_well_data){
+        $self->log->debug("Creating ES QC well for well ".$qc_well_data->{well_id}
+                         ." in run ".$qc_well_data->{crispr_es_qc_run_id});
+        my $qc_well = $self->dest_model->create_crispr_es_qc_well($qc_well_data) or die $!;
+    }
+
+    return $well_new;
 }
 
 sub retrieve_or_create_plate {
@@ -555,8 +605,8 @@ sub create_process_aux_data_crispr_ep{
 
     my $process = $well->output_processes->first;
 
-    $process_data->{cell_line} = $process->cell_line->name;
-    $process_data->{nuclease} = $process->nuclease->name;
+    $process_data->{cell_line} = $process->process_cell_line->cell_line->name;
+    $process_data->{nuclease} = $process->process_nuclease->nuclease->name;
 
     return;
 }
