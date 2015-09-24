@@ -1,7 +1,7 @@
 package LIMS2::Util::TestDatabase;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::TestDatabase::VERSION = '0.074';
+    $LIMS2::Util::TestDatabase::VERSION = '0.075';
 }
 ## use critic
 
@@ -138,6 +138,10 @@ crispr_loci                  => 'CrisprLocus',
 crisprs                      => 'Crispr',
 crispr_pairs                 => 'CrisprPair',
 crispr_designs               => 'CrisprDesign',
+crispr_plate_appends         => 'CrisprPlateAppends',
+crispr_plate_appends_type    => 'CrisprPlateAppendsType',
+crispr_es_qc_runs            => 'CrisprEsQcRun',
+crispr_es_qc_wells           => 'CrisprEsQcWell',
 qc_alignment_regions         => 'QcAlignmentRegion',
 qc_alignments                => 'QcAlignment',
 qc_test_results              => 'QcTestResult',
