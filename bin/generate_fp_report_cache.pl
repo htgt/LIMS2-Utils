@@ -105,7 +105,7 @@ sub cache_reports {
     my $species = shift;
     my @link_names = @_;
 
-    my $mech = WWW::Mechanize->new( timeout => 600 );
+    my $mech = WWW::Mechanize->new( timeout => 2400 );
 
     INFO 'Fetch top level ' . $species . ' page...';
     my $top_r = $mech->get( $front_page_url{$species} );
