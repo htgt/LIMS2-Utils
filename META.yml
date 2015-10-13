@@ -73,7 +73,6 @@ requires:
   Template: 0
   Template::Plugin: 0
   Text::CSV: 0
-  TraceServer: 0
   Try::Tiny: 0
   URI: 0
   WWW::Mechanize: 0
@@ -84,4 +83,4 @@ requires:
   namespace::autoclean: 0
   strict: 0
   warnings: 0
-version: 0.073
+version: 0.076

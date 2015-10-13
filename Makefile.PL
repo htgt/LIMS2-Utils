@@ -94,7 +94,6 @@ my %WriteMakefileArgs = (
     "Template" => 0,
     "Template::Plugin" => 0,
     "Text::CSV" => 0,
-    "TraceServer" => 0,
     "Try::Tiny" => 0,
     "URI" => 0,
     "WWW::Mechanize" => 0,
@@ -106,7 +105,7 @@ my %WriteMakefileArgs = (
     "strict" => 0,
     "warnings" => 0
   },
-  "VERSION" => "0.073",
+  "VERSION" => "0.076",
   "test" => {
     "TESTS" => "t/*.t"
   }

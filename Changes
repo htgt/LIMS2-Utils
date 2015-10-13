@@ -1,3 +1,13 @@
+0.076     2015-10-13 12:10:38 Europe/London
+
+0.075     2015-09-24 09:49:10 Europe/London
+
+   Look for LIMS2 managed scf files before fetching from TraceServer
+
+0.074     2015-09-03 12:30:35 Europe/London
+
+   Use traceserver http api instead of TraceServer.pm
+
 0.073     2015-08-12 13:28:29 Europe/London
 
     Updated front page caching to cache wide sub reports
