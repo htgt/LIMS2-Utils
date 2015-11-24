@@ -10,6 +10,7 @@ use namespace::autoclean;
 use JSON;
 use Readonly;
 require URI;
+use Data::Dumper;
 
 use Log::Log4perl qw(:easy);
 
