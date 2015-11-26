@@ -127,7 +127,8 @@ sub request {
     my $response = $self->ua->request($request);
     if ( $response->is_success ) {
         # DELETE method does not return JSON.
-        return $method eq 'DELETE' ? 1 : from_json( $response->content );
+        my $decoded_response = $method eq 'DELETE' ? 1 : from_json( $response->content );
+        return $decoded_response;
     }
 
     my $err_msg = "$method $uri: " . $response->status_line;
@@ -143,6 +144,17 @@ sub request {
     my $meta = __PACKAGE__->meta;
     my $targ_rep = 1;
 
+    # retrieve all entries of these types
+    foreach my $object_type ( qw( pipelines ) ) {
+        $meta->add_method(
+            "get_$object_type" => sub {
+                my ( $self, $params ) = @_;
+                return $self->request( 'GET', sprintf( '%s.json', $object_type ), undef, $targ_rep );
+            }
+        );
+    }
+
+    # find/create/update methods for entries of these types
     foreach my $key ( qw( allele targeting_vector es_cell genbank_file distribution_qc ) ) {
         $meta->add_method(
             "find_$key" => sub {

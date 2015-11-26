@@ -13,6 +13,7 @@ use Moose;
 use feature qw(say);
 use List::MoreUtils qw(uniq);
 use Data::Dumper;
+use Try::Tiny;
 
 with qw( MooseX::Log::Log4perl );
 
@@ -44,6 +45,13 @@ has commit => (
     required => 1,
 );
 
+has optional_checks => (
+    is       => 'ro',
+    isa      => 'Bool',
+    default  => 0,
+    required => 1,
+);
+
 has stats => (
     is  => 'rw',
     isa => 'HashRef',
@@ -69,6 +77,17 @@ has alleles => (
     }
 );
 
+has design_sponsors => (
+    is      => 'ro',
+    isa     => 'HashRef',
+    traits  => ['Hash'],
+    default => sub { {} },
+    handles => {
+        get_design_sponsor => 'get',
+        set_design_sponsor => 'set',
+    }
+);
+
 has targeting_vectors => (
     is      => 'ro',
     isa     => 'HashRef',
@@ -90,6 +109,45 @@ has es_cells => (
         seen_es_cell      => 'exists',
         es_cell_processed => 'set',
     }
+);
+
+has pipeline_ids => (
+    is      => 'ro',
+    isa     => 'HashRef',
+    traits  => ['Hash'],
+    handles => {
+        get_pipeline_id => 'get',
+    },
+    lazy_build => 1,
+);
+
+sub _build_pipeline_ids{
+    my $self = shift;
+    # find_pipeline
+    my @pipelines = @{ $self->tarmits_api->get_pipelines };
+    print Dumper(@pipelines);
+    return { map { $_->{name} => $_->{id} } @pipelines };
+}
+
+# Map of LIMS2 design_types to targrep mutation_types
+my %DESIGN_TYPES = (
+    conditional        => 'Conditional Ready',
+    deletion           => 'Deletion',
+    insertion          => 'Insertion',
+    'artificial-intron'  => 'Artificial Intron',
+    'intron-replacement' => undef,
+    'cre-bac'            => undef,
+    gibson               => undef,
+    'gibson-deletion'    => 'Deletion',
+    nonsense             => undef,
+);
+
+# Map of LIMS2 sponsors to targrep pipeline name
+my %SPONSORS = (
+    'Cre Knockin' => 'EUCOMMToolsCre',
+    'Cre BAC'     => 'EUCOMMToolsCre',
+    'MGP Recovery' => 'Sanger MGP',
+    'EUCOMMTools Recovery' => 'EUCOMMTools',
 );
 
 my %LIMS2_SUMMARY_COLUMNS = (
@@ -242,11 +300,12 @@ sub _build_name{
 
 sub build_allele_search{
     my ($self, $lims2_summary) = @_;
+    my $targrep_design_type = $DESIGN_TYPES{ $lims2_summary->design_type };
     my $search = {
         project_design_id_eq  => $lims2_summary->design_id,
         cassette_eq           => $lims2_summary->final_cassette_name,
         backbone_eq           => $lims2_summary->final_backbone_name,
-        mutation_type_name_eq => $lims2_summary->design_type,
+        mutation_type_name_eq => $targrep_design_type,
     };
     return $search;
 }
@@ -256,26 +315,51 @@ sub build_allele_data{
 
     my $design = $self->lims2_model->schema->resultset("Design")->find({ id => $lims2_summary->design_id });
 
+    # Find the design sponsor and store it for later use in vector and es cell creation
+    my $projects_rs = $self->lims2_model->schema->resultset("Project")->search({
+        gene_id => {
+            '-in' => $design->gene_ids,
+        }
+    });
+    my @sponsors = uniq map { $_->sponsor_ids } $projects_rs->all;
+    if(@sponsors > 1){
+        die "Multiple sponsors for design ".$design->id." don't know how to set targrep pipeline";
+    }
+    my $targrep_sponsor = $SPONSORS{ $sponsors[0] }
+        or die "No targrep sponsor found for ".$sponsors[0];
+    $self->set_design_sponsor($design->id, $targrep_sponsor);
+
+    my $targrep_design_type = $DESIGN_TYPES{ $lims2_summary->design_type };
+    my $gene_id = join ",", $design->gene_ids;
+    my $cassette_type = ( $lims2_summary->final_cassette_promoter ? 'Promotor Driven' : 'Promotorless' );
     my $data = {
         project_design_id  => $lims2_summary->design_id,
         cassette           => $lims2_summary->final_cassette_name,
+        cassette_type      => $cassette_type,
         backbone           => $lims2_summary->final_backbone_name,
-        mutation_type_name => $lims2_summary->design_type,
+        mutation_type_name => $targrep_design_type,
+        mutation_method_name => 'Targeted Mutation',
         assembly           => $design->info->default_assembly,
-        strand             => $design->chr_strand,
+        strand             => ( $design->chr_strand > 0 ? '+' : '-' ),
         chromosome         => $design->chr_name,
+        gene_mgi_accession_id => $gene_id,
     };
 
     # Add design feature coordinates
     my @design_feature_fields = map { $_."_start", $_."_end" } qw(homology_arm cassette loxp);
     foreach my $field (@design_feature_fields){
-        $data->{$field} = $design->info->$field;
+        my $targrep_field = $field;
+        if($design->chr_strand < 0){
+            # swap start and end for -ve strand designs
+            if($field =~ /start$/){
+               $targrep_field =~ s/start$/end/;
+            }
+            else{
+                $targrep_field =~ s/end$/start/;
+            }
+        }
+        $data->{$targrep_field} = $design->info->$field;
     }
-
-    # FIXME: temp fix as test version of imits requires targeting_vectors_attributes
-    # and es_cells_attributes arrays
-    $data->{targeting_vectors_attributes} = [];
-    $data->{es_cells_attributes} = [];
 
     return $data;
 }
@@ -292,13 +376,14 @@ sub build_es_cell_data{
     my $targvec_name = _build_name('final',$lims2_summary);
     my $targeting_vector_id = $self->get_targeting_vector_id($targvec_name)
         or die "Cannot find ID for targeting vector $targvec_name";
+    my $sponsor = $self->get_design_sponsor( $lims2_summary->design_id );
 
     my $data = {
         name                  => _build_name('ep_pick',$lims2_summary),
         allele_id             => $allele_id,
         targeting_vector_id   => $targeting_vector_id,
         parental_cell_line    => $lims2_summary->crispr_ep_well_cell_line,
-        pipeline_name         => 'LIMS2', # FIXME: I have no idea what this should be
+        pipeline_id           => $self->get_pipeline_id($sponsor),
         report_to_public      => 1, # I am assuming all accepted cell lines should be reported to public
     };
 
@@ -314,11 +399,12 @@ sub build_targvec_search{
 sub build_targvec_data{
     my ($self, $lims2_summary, $allele_id) = @_;
 
+    my $sponsor = $self->get_design_sponsor( $lims2_summary->design_id );
     my $data = {
         name                => _build_name('final',$lims2_summary),
         intermediate_vector => _build_name('int',$lims2_summary),
         allele_id           => $allele_id,
-        pipeline_name       => 'LIMS2', # FIXME: I have no idea what this should be
+        pipeline_id           => $self->get_pipeline_id($sponsor),
         report_to_public    => 1,
     };
 }
@@ -453,10 +539,12 @@ sub find_create_update{
     my $object_data = $VALIDATION_AND_METHODS{$object_type}{build_object_data}->($self,$lims2_object,$allele_id);
     if(@existing == 0){
         my $tarmits_object = $self->create($object_type, $object_data);
+        $self->log->info("Created new $object_type with ID ".$tarmits_object->{id});
         return $tarmits_object->{id};
     }
     elsif(@existing == 1){
         my $tarmits_object = $self->check_and_update($object_type, $existing[0], $object_data,);
+        $self->log->info("Checked existing $object_type with ID ".$tarmits_object->{id});
         return $tarmits_object->{id};
     }
     else{
@@ -467,7 +555,7 @@ sub find_create_update{
     return;
 }
 
-sub check_and_udpate{
+sub check_and_update{
     my ($self, $object_type, $tarmits_data, $lims2_data) = @_;
 
     my @check_fields = @{ $VALIDATION_AND_METHODS{$object_type}{fields} };
@@ -506,7 +594,9 @@ sub check_and_udpate{
             }
         }
     }
-    $self->update( $object_type, $object_name, $tarmits_data, \%update_data) if %update_data;
+    my $object = $tarmits_data;
+    $object = $self->update( $object_type, $object_name, $tarmits_data, \%update_data) if %update_data;
+    return $object;
 }
 
 sub update {
