@@ -12,8 +12,8 @@ use Getopt::Long;
 my $updater = LIMS2::Util::TarmitsUpdate->new({
     lims2_model => LIMS2::Model->new({ user => 'tasks' }),
     tarmits_api => LIMS2::Util::Tarmits->new_with_config,
-    genes       => [ 'Tram1' ],
     commit      => 1,
+    cpg_islands_only => 1,
 });
 
 

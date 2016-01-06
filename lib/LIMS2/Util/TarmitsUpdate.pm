@@ -13,7 +13,7 @@ use Moose;
 use feature qw(say);
 use List::MoreUtils qw(uniq);
 use Data::Dumper;
-use Try::Tiny;
+use TryCatch;
 
 with qw( MooseX::Log::Log4perl );
 
@@ -42,6 +42,16 @@ has commit => (
     is       => 'ro',
     isa      => 'Bool',
     default  => 0,
+    required => 1,
+);
+
+# Initially this script was written to transfer any designs
+# but it turns out it is only needed for ncRNA targeting designs
+# (those which target cpg islands) so instead of rewriting
+# I am adding am flag to provide some special behaviour for these cases
+has cpg_islands_only => (
+    is       => 'ro',
+    isa      => 'Bool',
     required => 1,
 );
 
@@ -148,6 +158,7 @@ my %SPONSORS = (
     'Cre BAC'     => 'EUCOMMToolsCre',
     'MGP Recovery' => 'Sanger MGP',
     'EUCOMMTools Recovery' => 'EUCOMMTools',
+    'Sanger MGP' => 'Sanger MGP',
 );
 
 my %LIMS2_SUMMARY_COLUMNS = (
@@ -168,21 +179,29 @@ my %LIMS2_SUMMARY_COLUMNS = (
         'final_cassette_conditional',
         'final_cassette_resistance',
     ],
-    vector => [ # FIXME: where to find ikmc project_id? get sponsor
+    vector => [
+        'design_id',
         'final_plate_name',
         'final_well_name',
         'final_well_accepted',
         'int_plate_name',
         'int_well_name',
     ],
-    es_cell => [ # FIXME: ikmc project id? allele symbol, e.g. tm1a(KOMP)Wtsi
+    es_cell => [
+        'design_id',
+        'design_gene_id',
+        'design_gene_symbol',
         'experiments', # use this to get sponsors
         'ep_pick_plate_name',
         'ep_pick_well_name',
         'final_plate_name',
         'final_well_name',
         'crispr_ep_well_cell_line',
+        'ep_first_cell_line_name',
         'ep_pick_well_accepted',
+        'int_recombinase_id',
+        'final_recombinase_id',
+        'ep_pick_well_recombinase_id',
     ],
 );
 
@@ -315,18 +334,24 @@ sub build_allele_data{
 
     my $design = $self->lims2_model->schema->resultset("Design")->find({ id => $lims2_summary->design_id });
 
-    # Find the design sponsor and store it for later use in vector and es cell creation
-    my $projects_rs = $self->lims2_model->schema->resultset("Project")->search({
-        gene_id => {
-            '-in' => $design->gene_ids,
-        }
-    });
-    my @sponsors = uniq map { $_->sponsor_ids } $projects_rs->all;
-    if(@sponsors > 1){
-        die "Multiple sponsors for design ".$design->id." don't know how to set targrep pipeline";
+    my $targrep_sponsor;
+    if($self->cpg_islands_only){
+        $targrep_sponsor = 'Sanger MGP';
     }
-    my $targrep_sponsor = $SPONSORS{ $sponsors[0] }
-        or die "No targrep sponsor found for ".$sponsors[0];
+    else{
+        # Find the design sponsor and store it for later use in vector and es cell creation
+        my $projects_rs = $self->lims2_model->schema->resultset("Project")->search({
+            gene_id => {
+                '-in' => $design->gene_ids,
+            }
+        });
+        my @sponsors = uniq map { $_->sponsor_ids } $projects_rs->all;
+        if(@sponsors > 1){
+            die "Multiple sponsors for design ".$design->id." don't know how to set targrep pipeline";
+        }
+        $targrep_sponsor = $SPONSORS{ $sponsors[0] }
+            or die "No targrep sponsor found for ".$sponsors[0];
+    }
     $self->set_design_sponsor($design->id, $targrep_sponsor);
 
     my $targrep_design_type = $DESIGN_TYPES{ $lims2_summary->design_type };
@@ -342,8 +367,15 @@ sub build_allele_data{
         assembly           => $design->info->default_assembly,
         strand             => ( $design->chr_strand > 0 ? '+' : '-' ),
         chromosome         => $design->chr_name,
-        gene_mgi_accession_id => $gene_id,
     };
+
+    if($self->cpg_islands_only){
+        # use different lims2 fields to set gene
+        $data->{gene_mgi_accession_id} = $lims2_summary->design_gene_id;
+    }
+    else{
+        $data->{gene_mgi_accession_id} = $gene_id;
+    }
 
     # Add design feature coordinates
     my @design_feature_fields = map { $_."_start", $_."_end" } qw(homology_arm cassette loxp);
@@ -382,12 +414,33 @@ sub build_es_cell_data{
         name                  => _build_name('ep_pick',$lims2_summary),
         allele_id             => $allele_id,
         targeting_vector_id   => $targeting_vector_id,
-        parental_cell_line    => $lims2_summary->crispr_ep_well_cell_line,
+        parental_cell_line    => ( $lims2_summary->crispr_ep_well_cell_line
+                                   || $lims2_summary->ep_first_cell_line_name ),
         pipeline_id           => $self->get_pipeline_id($sponsor),
         report_to_public      => 1, # I am assuming all accepted cell lines should be reported to public
+        allele_symbol         => $self->build_allele_symbol($lims2_summary),
+        ikmc_project_id       => 'LIMS2_'.$lims2_summary->design_id,
     };
 
     return $data;
+}
+
+sub build_allele_symbol{
+    my ($self,$lims2_summary) = @_;
+
+    unless($self->cpg_islands_only){
+        die "allele_symbol generation only implemented for ncRNA (cpg island) targeting at the moment";
+    }
+
+    my @recombinase_columns = qw(int_recombinase_id final_recombinase_id ep_pick_well_recombinase_id);
+
+    if( grep { $lims2_summary->$_ } @recombinase_columns ){
+         die "Found recombinases for gene ".$lims2_summary->design_gene_id
+         .". allele_symbol generation not yet implemented for these cases";
+    }
+
+    my $symbol = $lims2_summary->design_gene_id."<tm1(NCC)WCS>";
+    return $symbol;
 }
 
 sub build_targvec_search{
@@ -404,9 +457,12 @@ sub build_targvec_data{
         name                => _build_name('final',$lims2_summary),
         intermediate_vector => _build_name('int',$lims2_summary),
         allele_id           => $allele_id,
-        pipeline_id           => $self->get_pipeline_id($sponsor),
+        pipeline_id         => $self->get_pipeline_id($sponsor),
         report_to_public    => 1,
+        ikmc_project_id     => 'LIMS2_'.$lims2_summary->design_id,
     };
+
+    return $data;
 }
 
 sub lims2_to_tarmits{
@@ -418,20 +474,37 @@ sub lims2_to_tarmits{
     return;
 }
 
+# only ncRNA designs need to be transferred to imits
+# i.e. design_gene_id starts 'CGI_'
 sub get_alleles{
 	my $self = shift;
 
-	my %where = (
-        '-and' => [
-            'design_type' => { '!=', 'nonsense'},
-            '-or' => [
-                ep_pick_well_accepted => 1,
-                final_well_accepted   => 1,
+	my %where;
+
+    if($self->cpg_islands_only){
+        %where = (
+            '-and' => [
+                'design_species_id' => 'Mouse',
+                'design_gene_id' => { 'like' => 'CGI_%' },
+                '-or' => [
+                    ep_pick_well_accepted => 1,
+                    final_well_accepted   => 1,
+                ]
             ]
-        ]
-	);
-
-
+    	);
+    }
+    else{
+        %where = (
+            '-and' => [
+                'design_species_id' => 'Mouse',
+                'design_type' => { '!=' => 'nonsense' },
+                '-or' => [
+                    ep_pick_well_accepted => 1,
+                    final_well_accepted   => 1,
+                ]
+            ]
+        );
+    }
 
 	if ($self->has_genes){
 		$where{design_gene_symbol} = { '-in' => $self->genes };
@@ -616,10 +689,10 @@ sub update {
 
         $object = $self->tarmits_api->$update_method( $tarmits_data->{id}, $update_data );
     }
-    catch {
+    catch($e){
         $self->stats->{$object_type}{update}--;
-        die ( "Unable to update $object_type: $object_name " . $_ );
-    };
+        die ( "Unable to update $object_type: $object_name " . $e );
+    }
 
     return $object;
 }
@@ -643,10 +716,10 @@ sub create {
 
         $object = $self->tarmits_api->$create_method( $object_data );
     }
-    catch {
+    catch($e){
         $self->stats->{$object_type}{create}--;
-        die( "Unable to create $object_type: $object_name " . $_ );
-    };
+        die( "Unable to create $object_type: $object_name " . $e );
+    }
 
     return $object;
 }
