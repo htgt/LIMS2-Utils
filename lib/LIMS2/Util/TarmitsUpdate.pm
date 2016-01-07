@@ -139,6 +139,40 @@ sub _build_pipeline_ids{
     return { map { $_->{name} => $_->{id} } @pipelines };
 }
 
+# Parse file downloaded from ftp://ftp.informatics.jax.org/pub/reports/MGI_MRK_Coord.rpt
+# (it is large so I pre-filtered this with grep to include only lines with Cpgi symbols on them)
+# tab delimited. 1st column is the MGI:xxxxx ID, 4th column is the Cpgixxxx symbol
+has mgi_ids_report => (
+    is     => 'ro',
+    isa    => 'Str',
+    required => 0,
+);
+
+has mgi_id_for_cpgi => (
+    is      => 'ro',
+    isa     => 'HashRef',
+    lazy_build => 1,
+);
+
+sub _build_mgi_id_for_cpgi{
+    my $self = shift;
+    my $report_path = $self->mgi_ids_report
+        or die "attribute mgi_ids_report has not been set";
+
+    open (my $fh, "<", $report_path)
+        or die "Cannot open mgi_ids_report at $report_path - $!";
+
+    $self->log->info("Loading Cpgi to MGI ID mapping file $report_path");
+    my $ids = {};
+    foreach my $line (<$fh>){
+        my @values = split "\t", $line;
+        $ids->{$values[3]} = $values[0];
+    }
+    $self->log->info("Cpgi to MGI ID mapping loaded");
+
+    return $ids;
+}
+
 # Map of LIMS2 design_types to targrep mutation_types
 my %DESIGN_TYPES = (
     conditional        => 'Conditional Ready',
@@ -170,6 +204,7 @@ my %LIMS2_SUMMARY_COLUMNS = (
     ],
     allele => [    # FIXME: what should we use as mutation_type? is design_type ok?
         'design_id',
+        'design_gene_id',
         'design_gene_symbol',
         'design_type',
         'final_cassette_name',
@@ -355,7 +390,7 @@ sub build_allele_data{
     $self->set_design_sponsor($design->id, $targrep_sponsor);
 
     my $targrep_design_type = $DESIGN_TYPES{ $lims2_summary->design_type };
-    my $gene_id = join ",", $design->gene_ids;
+
     my $cassette_type = ( $lims2_summary->final_cassette_promoter ? 'Promotor Driven' : 'Promotorless' );
     my $data = {
         project_design_id  => $lims2_summary->design_id,
@@ -370,11 +405,16 @@ sub build_allele_data{
     };
 
     if($self->cpg_islands_only){
-        # use different lims2 fields to set gene
-        $data->{gene_mgi_accession_id} = $lims2_summary->design_gene_id;
+        # find MGI:xxx accession for Cpgi symbol
+        my $cpgi_symbol = $lims2_summary->design_gene_id;
+        $cpgi_symbol =~ s/^CGI_/Cpgi/;
+        my $mgi_id = $self->mgi_id_for_cpgi->{$cpgi_symbol}
+            or die "No MGI ID found for symbol $cpgi_symbol";
+
+        $data->{gene_mgi_accession_id} = $mgi_id;
     }
     else{
-        $data->{gene_mgi_accession_id} = $gene_id;
+        $data->{gene_mgi_accession_id} = $lims2_summary->design_gene_id;
     }
 
     # Add design feature coordinates
@@ -418,14 +458,14 @@ sub build_es_cell_data{
                                    || $lims2_summary->ep_first_cell_line_name ),
         pipeline_id           => $self->get_pipeline_id($sponsor),
         report_to_public      => 1, # I am assuming all accepted cell lines should be reported to public
-        allele_symbol         => $self->build_allele_symbol($lims2_summary),
+        mgi_allele_symbol_superscript => $self->build_allele_symbol_superscript($lims2_summary),
         ikmc_project_id       => 'LIMS2_'.$lims2_summary->design_id,
     };
 
     return $data;
 }
 
-sub build_allele_symbol{
+sub build_allele_symbol_superscript{
     my ($self,$lims2_summary) = @_;
 
     unless($self->cpg_islands_only){
@@ -439,7 +479,7 @@ sub build_allele_symbol{
          .". allele_symbol generation not yet implemented for these cases";
     }
 
-    my $symbol = $lims2_summary->design_gene_id."<tm1(NCC)WCS>";
+    my $symbol = "tm1(NCC)WCS";
     return $symbol;
 }
 
@@ -533,7 +573,7 @@ sub process_alleles{
 
         my $allele_id = $self->get_allele_id($key);
 
-        if($allele_id){
+        if($self->seen_allele($key)){
             $self->log->info("allele already processed");
         }
         else{
@@ -691,7 +731,9 @@ sub update {
     }
     catch($e){
         $self->stats->{$object_type}{update}--;
-        die ( "Unable to update $object_type: $object_name " . $e );
+        $self->stats->{$object_type}{update_fail}++;
+        $self->log->error("Unable to update $object_type: $object_name " . $e );
+        return { id => $tarmits_data->{id} };
     }
 
     return $object;
@@ -718,7 +760,9 @@ sub create {
     }
     catch($e){
         $self->stats->{$object_type}{create}--;
-        die( "Unable to create $object_type: $object_name " . $e );
+        $self->stats->{$object_type}{create_fail}++;
+        $self->log->error("Unable to create $object_type: $object_name " . $e );
+        return { id => undef };
     }
 
     return $object;
@@ -727,8 +771,11 @@ sub create {
 sub report_stats{
     my ($self) = @_;
     foreach my $type (sort keys %{ $self->stats }){
+        say "";
         say "Number of $type created: ".( $self->stats->{$type}->{create} || "");
         say "Number of $type updated: ".( $self->stats->{$type}->{update} || "");
+        say "Number of $type create failed: ".( $self->stats->{$type}->{create_fail} || "");
+        say "Number of $type update failed: ".( $self->stats->{$type}->{update_fail} || "");
     }
 }
 
