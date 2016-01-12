@@ -14,6 +14,8 @@ use feature qw(say);
 use List::MoreUtils qw(uniq);
 use Data::Dumper;
 use TryCatch;
+use LIMS2::Model::Util::EngSeqParams qw( generate_custom_eng_seq_params );
+use Bio::SeqIO;
 
 with qw( MooseX::Log::Log4perl );
 
@@ -275,6 +277,9 @@ my %VALIDATION_AND_METHODS = (
         update        => \&update_genbank,
         update_method => 'update_genbank_file',
         create_method => 'create_genbank_file',
+        find_method   => 'find_genbank_file',
+        build_search_data => \&build_genbank_search,
+        build_object_data => \&build_genbank_data,
     },
     es_cell => {
         fields => [
@@ -432,8 +437,61 @@ sub build_allele_data{
         }
         $data->{$targrep_field} = $design->info->$field;
     }
+    return $data;
+}
+
+sub build_genbank_search{
+    my ($self, $lims2_summary, $allele_id) = @_;
+    my $search = {
+        allele_id => $allele_id,
+    };
+    return $search;
+}
+
+sub build_genbank_data{
+    my ($self, $lims2_summary, $allele_id) = @_;
+
+    my $design = $self->lims2_model->schema->resultset("Design")->find({ id => $lims2_summary->design_id });
+
+    my $data = {
+        allele_id => $allele_id,
+    };
+    #Generate a sequence file from a user specified design, cassette and backbone combination.
+    #If a backbone is specified vector sequence is produced, if not then allele sequence is
+    #returned. In addition one or more recombinases can be specified.
+    my $input_params = {
+        design_id => $lims2_summary->design_id,
+        cassette  => $lims2_summary->final_cassette_name,
+    };
+
+    $data->{escell_clone}     = $self->generate_seq($input_params,$design);
+
+    # Add backbone to generate targ vec sequence
+    $input_params->{backbone} = $lims2_summary->final_backbone_name;
+    $data->{targeting_vector} = $self->generate_seq($input_params,$design);
 
     return $data;
+}
+
+sub generate_seq{
+    my ($self, $input_params, $design) = @_;
+
+    my ( $method, $eng_seq_params )
+        = generate_custom_eng_seq_params( $self->lims2_model, $input_params, $design );
+    my $eng_seq = $self->lims2_model->eng_seq_builder->$method( %{$eng_seq_params} );
+
+    return _stringify_bioseq($eng_seq);
+}
+
+sub _stringify_bioseq {
+    my $seq = shift;
+    my $str = '';
+    my $io  = Bio::SeqIO->new(
+        -fh     => IO::String->new($str),
+        -format => 'genbank',
+    );
+    $io->write_seq($seq);
+    return $str;
 }
 
 sub build_es_cell_search{
@@ -581,8 +639,12 @@ sub process_alleles{
                 $self->log->info("$col: ".$allele->$col);
             }
 
-            $allele_id = $self->find_create_update('allele', $allele); # FIXME: find/create/update allele and return ID
+            $allele_id = $self->find_create_update('allele', $allele);
             $self->allele_processed($key, $allele_id);
+
+            if($allele_id){
+                $self->find_create_update('genbank_file',$allele, $allele_id);
+            }
         }
 
         if($allele->final_well_accepted){
@@ -644,7 +706,7 @@ sub process_es_cell{
 sub find_create_update{
     my ($self, $object_type, $lims2_object, $allele_id) = @_;
 
-    my $search_data = $VALIDATION_AND_METHODS{$object_type}{build_search_data}->($self,$lims2_object);
+    my $search_data = $VALIDATION_AND_METHODS{$object_type}{build_search_data}->($self,$lims2_object,$allele_id);
     my $find_method = $VALIDATION_AND_METHODS{$object_type}{find_method};
 
     my @existing = @{ $self->tarmits_api->$find_method($search_data) };
