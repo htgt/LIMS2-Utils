@@ -49,9 +49,9 @@ has commit => (
 
 # Initially this script was written to transfer any designs
 # but it turns out it is only needed for ncRNA targeting designs
-# (those which target cpg islands) so instead of rewriting
+# so instead of rewriting
 # I am adding am flag to provide some special behaviour for these cases
-has cpg_islands_only => (
+has ncRNA_only => (
     is       => 'ro',
     isa      => 'Bool',
     required => 1,
@@ -375,7 +375,7 @@ sub build_allele_data{
     my $design = $self->lims2_model->schema->resultset("Design")->find({ id => $lims2_summary->design_id });
 
     my $targrep_sponsor;
-    if($self->cpg_islands_only){
+    if($self->ncRNA_only){
         $targrep_sponsor = 'Sanger MGP';
     }
     else{
@@ -409,7 +409,7 @@ sub build_allele_data{
         chromosome         => $design->chr_name,
     };
 
-    if($self->cpg_islands_only){
+    if($lims2_summary->design_gene_symbol eq 'CPG_island'){
         # find MGI:xxx accession for Cpgi symbol
         my $cpgi_symbol = $lims2_summary->design_gene_id;
         $cpgi_symbol =~ s/^CGI_/Cpgi/;
@@ -437,9 +437,38 @@ sub build_allele_data{
         }
         $data->{$targrep_field} = $design->info->$field;
     }
+
+    $self->_catch_no_gap_errors($design->chr_strand, $data);
+
     return $data;
 }
 
+# If there is no gap between oligos in the design (e.g. D5 ends at 86 and D3 starts at 87)
+# then the coords are the wrong way round due to +/-1 being applied to the oligo coords in DesignInfo
+# There are quite a few of these so I adjust them here..
+sub _catch_no_gap_errors{
+    my ($self,$chr_strand, $data) = @_;
+
+    foreach my $feature qw(homology_arm cassette loxp){
+
+        my $start = $data->{$feature."_start"};
+        my $end = $data->{$feature."_end"};
+
+        if($chr_strand > 0 and $start > $end and $start-$end == 1){
+            $self->log->debug("Zero gap for $feature detected on $chr_strand strand. Fixing coords");
+            $data->{$feature."_start"} = $end;
+            $data->{$feature."_end"}   = $start;
+        }
+
+        if($chr_strand < 0 and $end > $start and $end-$start == 1){
+            $self->log->debug("Zero gap for $feature detected on $chr_strand strand. Fixing coords");
+            $data->{$feature."_start"} = $end;
+            $data->{$feature."_end"}   = $start;
+        }
+
+    }
+    return;
+}
 sub build_genbank_search{
     my ($self, $lims2_summary, $allele_id) = @_;
     my $search = {
@@ -505,7 +534,7 @@ sub build_es_cell_data{
 
     my $targvec_name = _build_name('final',$lims2_summary);
     my $targeting_vector_id = $self->get_targeting_vector_id($targvec_name)
-        or die "Cannot find ID for targeting vector $targvec_name";
+        or $self->log->error("Cannot find ID for targeting vector $targvec_name");
     my $sponsor = $self->get_design_sponsor( $lims2_summary->design_id );
 
     my $data = {
@@ -526,8 +555,8 @@ sub build_es_cell_data{
 sub build_allele_symbol_superscript{
     my ($self,$lims2_summary) = @_;
 
-    unless($self->cpg_islands_only){
-        die "allele_symbol generation only implemented for ncRNA (cpg island) targeting at the moment";
+    unless($self->ncRNA_only){
+        die "allele_symbol generation only implemented for ncRNA targeting at the moment";
     }
 
     my @recombinase_columns = qw(int_recombinase_id final_recombinase_id ep_pick_well_recombinase_id);
@@ -579,11 +608,11 @@ sub get_alleles{
 
 	my %where;
 
-    if($self->cpg_islands_only){
+    if($self->ncRNA_only){
         %where = (
             '-and' => [
                 'design_species_id' => 'Mouse',
-                'design_gene_id' => { 'like' => 'CGI_%' },
+                'final_cassette_name' => 'L1L2_lncRNA_xpA3_BactNeo',
                 '-or' => [
                     ep_pick_well_accepted => 1,
                     final_well_accepted   => 1,
