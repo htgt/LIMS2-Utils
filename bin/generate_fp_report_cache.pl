@@ -68,7 +68,6 @@ my @human_link_names = (
     'Stem Cell Engineering',
     'Transfacs',
     'Human Genetics',
-    'Decipher',
 );
 
 my @mouse_link_names = (
