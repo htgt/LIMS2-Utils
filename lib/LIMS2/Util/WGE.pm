@@ -10,6 +10,7 @@ use MooseX::Types::Path::Class;
 use Try::Tiny;
 use LIMS2::REST::Client;
 use namespace::autoclean;
+use Data::Dumper;
 
 with qw( MooseX::Log::Log4perl );
 
@@ -95,7 +96,6 @@ sub get_crispr {
         seq       => $wge_crispr->{seq},
         off_target_summary => $wge_crispr->{off_target_summary},
     };
-
     return $crispr;
 }
 
@@ -112,7 +112,7 @@ sub _get_crispr {
         $self->log->debug( "Error retrieving WGE CRISPR: \n" . $_ );
         LIMS2::Exception->throw( "Invalid WGE crispr id: $id" );
     };
-
+$self->log->debug(Dumper $crispr_data);
     return $crispr_data;
 }
 
@@ -135,7 +135,7 @@ sub get_crispr_pair {
         $self->log->debug( "Error retrieving CRISPR pair: \n" . $_ );
         LIMS2::Exception->throw( "Invalid WGE pair id: ${left_id}_${right_id}" );
     };
-
+$self->log->debug(Dumper $crispr_pair_data);
     return $crispr_pair_data;
 }
 
