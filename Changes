@@ -1,5 +1,12 @@
 {{$NEXT}}
 
+0.077     2016-01-28 09:51:48 Europe/London
+
+    Added Decipher sponsor to front page caching
+    removed deprecated t/30-lims2-util-solr.t
+
+0.076     2015-10-13 12:10:38 Europe/London
+
 0.075     2015-09-24 09:49:10 Europe/London
 
    Look for LIMS2 managed scf files before fetching from TraceServer
