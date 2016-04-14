@@ -1,5 +1,9 @@
 {{$NEXT}}
 
+0.078     2016-04-14 11:20:43 Europe/London
+
+    TraceServer can now fetch old versions of seq data
+
 0.077     2016-01-28 09:51:48 Europe/London
 
     Added Decipher sponsor to front page caching
