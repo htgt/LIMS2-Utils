@@ -5,6 +5,7 @@ META.yml
 Makefile.PL
 README
 README.md
+bin/create_bespoke_targrep_entries.pl
 bin/fixture_data_bacs.pl
 bin/fixture_data_crisprs.pl
 bin/fixture_data_designs.pl
@@ -13,6 +14,7 @@ bin/fixture_data_plate_wells.pl
 bin/generate_crispr_group_genotyping_primers.pl
 bin/generate_fp_report_cache.pl
 bin/get_trace.pl
+bin/lims2_update_tarmits.pl
 bin/post.sh
 bin/redesign_primers.pl
 bin/tarmits_feed_wrapper.pl
@@ -34,6 +36,7 @@ lib/LIMS2/Util/Retry.pm
 lib/LIMS2/Util/Solr.pm
 lib/LIMS2/Util/Tarmits.pm
 lib/LIMS2/Util/TarmitsFeedCreKnockin.pm
+lib/LIMS2/Util/TarmitsUpdate.pm
 lib/LIMS2/Util/TestDatabase.pm
 lib/LIMS2/Util/TraceServer.pm
 lib/LIMS2/Util/WGE.pm

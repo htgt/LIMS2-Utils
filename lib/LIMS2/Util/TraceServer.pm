@@ -1,7 +1,7 @@
 package LIMS2::Util::TraceServer;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::TraceServer::VERSION = '0.075';
+    $LIMS2::Util::TraceServer::VERSION = '0.078';
 }
 ## use critic
 
@@ -80,12 +80,17 @@ Given a trace name return the binary SCF data in a string
 
 =cut
 sub get_trace {
-    my ( $self, $name ) = @_;
+    my ( $self, $name, $version ) = @_;
 
     my ($project_name) = ( $name =~ /^(\w*)[a-zA-Z]\d\d\..*/g );
     $project_name =~ s/_\d$//g;
 
-    my $scf_path = $self->lims2_seq_dir->subdir($project_name)->file($name.".scf")->stringify;
+    my $data_dir = $self->lims2_seq_dir->subdir($project_name);
+    if($version){
+        $data_dir = $data_dir->subdir($version);
+    }
+    my $scf_path = $data_dir->file($name.".scf")->stringify;
+
     my $lims2_scf_uri = $self->fileserver_uri.$scf_path;
     $self->log->debug("getting trace from uri $lims2_scf_uri");
     my $fileserver_response = $self->user_agent->get($lims2_scf_uri);
