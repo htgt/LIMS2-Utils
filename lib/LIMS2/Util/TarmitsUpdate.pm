@@ -163,10 +163,12 @@ sub _build_mgi_id_for_cpgi{
 
     open (my $fh, "<", $report_path)
         or die "Cannot open mgi_ids_report at $report_path - $!";
+    my @lines = <$fh>;
+    close $fh;
 
     $self->log->info("Loading Cpgi to MGI ID mapping file $report_path");
     my $ids = {};
-    foreach my $line (<$fh>){
+    foreach my $line (@lines){
         my @values = split "\t", $line;
         $ids->{$values[3]} = $values[0];
     }
@@ -423,7 +425,7 @@ sub build_allele_data{
     }
 
     # Add design feature coordinates
-    my @design_feature_fields = map { $_."_start", $_."_end" } qw(homology_arm cassette loxp);
+    my @design_feature_fields = map { ($_."_start", $_."_end") } qw(homology_arm cassette loxp);
     foreach my $field (@design_feature_fields){
         my $targrep_field = $field;
         if($design->chr_strand < 0){
@@ -803,6 +805,8 @@ sub check_and_update{
     return $object;
 }
 
+# perl critic cannot see return after try catch so complains - turn it off
+## no critic (RequireFinalReturn)
 sub update {
     my ( $self, $object_type, $object_name, $tarmits_data, $update_data ) = @_;
     $self->stats->{$object_type}{update}++;
@@ -858,6 +862,7 @@ sub create {
 
     return $object;
 }
+## use critic
 
 sub report_stats{
     my ($self) = @_;
@@ -868,6 +873,7 @@ sub report_stats{
         say "Number of $type create failed: ".( $self->stats->{$type}->{create_fail} || "");
         say "Number of $type update failed: ".( $self->stats->{$type}->{update_fail} || "");
     }
+    return;
 }
 
 1;

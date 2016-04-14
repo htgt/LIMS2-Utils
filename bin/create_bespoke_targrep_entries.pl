@@ -11,8 +11,6 @@ Log::Log4perl->easy_init($DEBUG);
 
 my ($input) = @ARGV;
 
-open (my $fh, "<", $input) or die "Cannot open file $input - $!";
-
 my $objects = {
     allele => {},
     targeting_vector => {},
@@ -25,7 +23,11 @@ my @object_headers;
 my @headers;
 my @line_nums;
 
-while (my $line  = <$fh>){
+open (my $fh, "<", $input) or die "Cannot open file $input - $!";
+my @input = <$fh>;
+close $fh;
+
+while (my $line  = @input){
 	chomp $line;
 	my @items = split /\t/, $line;
 	if($. == 1){
@@ -47,6 +49,7 @@ while (my $line  = <$fh>){
 		}
 	}
 }
+close $fh;
 
 DEBUG "Getting pipeline name->ID mapping from targ_rep";
 my @pipelines = @{ $tarmits->get_pipelines };
