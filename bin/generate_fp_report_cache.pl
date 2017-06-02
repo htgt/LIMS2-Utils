@@ -62,6 +62,7 @@ my %front_page_url = (
 
 my @human_link_names = (
     'All',
+    'Cellular Genetics',
     'Experimental Cancer Genetics',
     'Mutation',
     'Pathogen',
