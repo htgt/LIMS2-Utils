@@ -1,7 +1,7 @@
 package LIMS2::Util::WGE;
 ## no critic(RequireUseStrict,RequireUseWarnings)
 {
-    $LIMS2::Util::WGE::VERSION = '0.075';
+    $LIMS2::Util::WGE::VERSION = '0.079';
 }
 ## use critic
 
