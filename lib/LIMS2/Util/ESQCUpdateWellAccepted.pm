@@ -1,4 +1,10 @@
 package LIMS2::Util::ESQCUpdateWellAccepted;
+## no critic(RequireUseStrict,RequireUseWarnings)
+{
+    $LIMS2::Util::ESQCUpdateWellAccepted::VERSION = '0.075';
+}
+## use critic
+
 
 =head1 NAME
 

@@ -1,4 +1,10 @@
 package LIMS2::Util::TarmitsFeedCreKnockin;
+## no critic(RequireUseStrict,RequireUseWarnings)
+{
+    $LIMS2::Util::TarmitsFeedCreKnockin::VERSION = '0.075';
+}
+## use critic
+
 
 use Moose;
 use LIMS2::Model;
