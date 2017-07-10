@@ -11,10 +11,10 @@ use LIMS2::Model::Constants qw( %DEFAULT_SPECIES_BUILD );
 use List::Util qw(sum first);
 use Log::Log4perl ':easy';
 
-use constant {
-    HUMAN_URL => 'http://www.genenames.org/cgi-bin/download?col=gd_hgnc_id&col=gd_app_sym&col=gd_app_name&col=gd_pub_chrom_map&col=md_ensembl_id&status=Approved&status_opt=2&where=&order_by=gd_app_sym_sort&format=text&limit=&hgnc_dbtag=on&submit=submit',
-    MOUSE_URL => 'http://www.informatics.jax.org/downloads/reports/MRK_ENSEMBL.rpt'
-};
+use Const::Fast;
+const my $HUMAN_URL => 'http://www.genenames.org/cgi-bin/download?col=gd_hgnc_id&col=gd_app_sym&col=gd_app_name&col=gd_pub_chrom_map&col=md_ensembl_id&status=Approved&status_opt=2&where=&order_by=gd_app_sym_sort&format=text&limit=&hgnc_dbtag=on&submit=submit';
+const my $MOUSE_URL => 'http://www.informatics.jax.org/downloads/reports/MRK_ENSEMBL.rpt';
+
 #my $depr_mouse_location = 'ftp://ftp.informatics.jax.org/pub/reports/MGI_AllGenes.rpt';
 
 my $start_time=localtime;
@@ -28,7 +28,7 @@ my $human_file = '/tmp/hgnc_list.txt';
 # get list of HGNC approved symbols and save it on the new file
 INFO "Getting list of HGNC genes...\n";
 open my $HGNC, '>', "$human_file" or die $!;
-my $page = get(HUMAN_URL)
+my $page = get($HUMAN_URL)
 or die ERROR "Could not get list of HGNC genes.\n";
 print $HGNC $page;
 close $HGNC;
@@ -40,7 +40,7 @@ my $mouse_file = '/tmp/mgi_list.txt';
 
 # get list of MGI approved symbols
 INFO "Getting list of MGI genes...\n";
-my $status = getstore(MOUSE_URL, $mouse_file);
+my $status = getstore($MOUSE_URL, $mouse_file);
 if ( $status != 200) {
     die ERROR "Could not get list of MGI genes.\n";
 }
