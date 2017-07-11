@@ -49,4 +49,5 @@ sub test_it {
         is_deeply $it->next, $DATA[$_], "record $_";
     }
     ok ! $it->next, 'iterator is exhausted';
+    return;
 }
