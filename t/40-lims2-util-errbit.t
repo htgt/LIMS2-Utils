@@ -5,7 +5,7 @@ use warnings FATAL => 'all';
 
 use Test::Most;
 
-my $trace = <<END;
+my $trace = <<"END";
 Caught exception in LIMS2::WebApp::Controller::User::QC->index "useful error message at /nfs/users/nfs_a/ah19/LIMS2-WebApp/script/../lib/LIMS2/WebApp/Controller/User/QC.pm line 53, <DATA> line 998. 
     LIMS2::WebApp::Controller::User::QC::index('LIMS2::WebApp::Controller::User::QC=HASH(0x7b53c18)', 'LIMS2::WebApp=HASH(0x7892728)') called at /opt/t87/global/software/perl/lib/perl5/Catalyst/Action.pm line 65 
     Catalyst::Action::execute('Catalyst::Action=HASH(0x7d14ba8)', 'LIMS2::WebApp::Controller::User::QC=HASH(0x7b53c18)', 'LIMS2::WebApp=HASH(0x7892728)') called at /opt/t87/global/software/perl/lib/perl5/Catalyst.pm line 1691 eval {...} called at /opt/t87/global/software/perl/lib/perl5/Catalyst.pm line 1691 

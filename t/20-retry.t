@@ -11,7 +11,7 @@ is retry( sub { 1 } ), 1, 'retry sub, scalar context';
 
 is_deeply [ retry( sub { qw( a b c ) } ) ], [ qw( a b c ) ], 'retry sub, list context';
 
-{   
+{
     my $n_attempts = 0;
 
     throws_ok { retry( sub {

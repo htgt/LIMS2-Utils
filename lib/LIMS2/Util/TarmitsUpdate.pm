@@ -1,4 +1,10 @@
 package LIMS2::Util::TarmitsUpdate;
+## no critic(RequireUseStrict,RequireUseWarnings)
+{
+    $LIMS2::Util::TarmitsUpdate::VERSION = '0.080';
+}
+## use critic
+
 
 =head
 

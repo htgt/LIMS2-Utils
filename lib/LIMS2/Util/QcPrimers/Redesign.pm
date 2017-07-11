@@ -1,4 +1,10 @@
 package LIMS2::Util::QcPrimers::Redesign;
+## no critic(RequireUseStrict,RequireUseWarnings)
+{
+    $LIMS2::Util::QcPrimers::Redesign::VERSION = '0.080';
+}
+## use critic
+
 
 =head1 NAME
 

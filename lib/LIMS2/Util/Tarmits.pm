@@ -1,4 +1,10 @@
 package LIMS2::Util::Tarmits;
+## no critic(RequireUseStrict,RequireUseWarnings)
+{
+    $LIMS2::Util::Tarmits::VERSION = '0.080';
+}
+## use critic
+
 
 use strict;
 use warnings FATAL => 'all';
@@ -11,6 +17,8 @@ use JSON;
 use Readonly;
 require URI;
 use Data::Dumper;
+use IPC::Open3;
+use IO::Select;
 
 use Log::Log4perl qw(:easy);
 
@@ -159,9 +167,45 @@ sub request {
         $meta->add_method(
             "find_$key" => sub {
                 my ( $self, $params ) = @_;
-                return $self->request( 'GET', sprintf( '%ss.json', $key ), $params, $targ_rep );
+
+                my $user = $self->username;
+                my $passw = $self->password;
+                my @query = keys %$params;
+                my $value = $params->{$query[0]};
+                my $url = sprintf("%starg_rep/%ss.json?%s=%s", $self->base_url, $key, $query[0], $value);
+                my $arr_resp = [];
+
+                my ($wtr, $rdr, $err);
+                my $pid = open3($wtr, $rdr, $err, "/bin/bash");
+
+                my $sel = IO::Select->new();
+                $sel->add($rdr);
+
+                my $cmd = "curl --silent -u $user:$passw $url 2>&1";
+                print $wtr "$cmd\n";
+
+                my $buffer = '';
+                sysread($rdr, $buffer, 4096);
+
+                if ($buffer) {
+                    my @arr1 = split /^\[/, $buffer;
+                    my @arr2 = split /\]$/, $arr1[1];
+
+                    my $json_resp = JSON::decode_json($arr2[0]);
+
+                    $arr_resp->[0] = $json_resp;
+                }
+
+                return $arr_resp;
             }
         );
+
+#        $meta->add_method(
+#            "find_$key" => sub {
+#                my ( $self, $params ) = @_;
+#                return $self->request( 'GET', sprintf( '%ss.json', $key ), $params, $targ_rep );
+#            }
+#        );
 
         $meta->add_method(
             "update_$key" => sub {
