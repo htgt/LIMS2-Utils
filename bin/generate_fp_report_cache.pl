@@ -7,6 +7,8 @@ use Sys::Hostname;
 use Log::Log4perl ':easy';
 use Getopt::Long;
 use Pod::Usage;
+use Config::Tiny;
+use Data::Dumper;
 
 my $log_level = $INFO;
 
@@ -106,9 +108,18 @@ exit();
 sub cache_reports {
     my $species = shift;
     my @link_names = @_;
-
+    my $config = Config::Tiny->read($ENV{LIMS2_REST_CLIENT_CONFIG});
+    my $username = $config->{_}->{username};
+    my $password = $config->{_}->{password};
     my $mech = WWW::Mechanize->new( timeout => 2400 );
 
+    $mech -> cookie_jar(HTTP::Cookies->new());
+    $mech -> get($base_path . '/login');
+    $mech -> form_name('login_form');
+    $mech -> field ('username' => $username);
+    $mech -> field ('password' => $password);
+    $mech -> click ('login');
+    $mech -> get($base_path);
     INFO 'Fetch top level ' . $species . ' page...';
     my $top_r = $mech->get( $front_page_url{$species} );
     server_responder( $top_r );
@@ -126,6 +137,8 @@ sub cache_reports {
         cache_csv_content( $mech, $name );
     }
 
+    $mech->follow_link( url_regex => qr/Logout/i );
+    $mech -> get($base_path . '/logout');
     return;
 }
 
@@ -135,9 +148,10 @@ sub cache_front_page {
 
     INFO "..caching front page $species reports:";
     my $content = $mech->content();
-
     $content =~ s/sponsor_report\/[^\/]+\/([^\/]+)\/Genes\?[^"]*/cached_sponsor_report\/$1/g;
     $content =~ s/without_cache/with_cache/g;
+    $content =~ s/<b><a/<b><span/g;
+    $content =~ s/<\/a><\/b>/<\/span><\/b>/g;
     $content =~ s/(?<=[^:])\/\/+/\//g;
 
     my $report_file_name = report_file( $species );
@@ -155,7 +169,6 @@ sub cache_front_page {
     return;
 }
 
-
 sub cache_sub_page_full {
     my $mech = shift;
     my $species = shift;
@@ -166,6 +179,7 @@ sub cache_sub_page_full {
     $content =~ s/sponsor_report\/[^\/]+\/([^\/]+)\/Genes[^>]*type=simple/cached_sponsor_report_simple\/$1/g;
     $content =~ s/sponsor_report\/[^\/]+\/([^\/]+)\/Genes[^>]*csv=1/cached_sponsor_csv\/$1/g;
     $content =~ s/without_cache/with_cache/g;
+    $content =~ s/htgt_qc\ /Your profile\ /g;
     $content =~ s/(?<=[^:])\/\/+/\//g;
 
     my $report_file_name = report_file( $species );
@@ -199,6 +213,7 @@ sub cache_sub_page_simple {
     $content =~ s/sponsor_report\/[^\/]+\/([^\/]+)\/Genes[^>]*csv=1/cached_sponsor_csv\/$1/g;
     $content =~ s/without_cache/with_cache/g;
     $content =~ s/(?<=[^:])\/\/+/\//g;
+    $content =~ s/htgt_qc\ /Your profile\ /g;
 
     my $report_file_name = report_file_simple( $species );
     INFO 'Writing html for ' . $species . ' simple report to ' . $report_file_name;
@@ -214,7 +229,6 @@ sub cache_sub_page_simple {
 
     return;
 }
-
 
 sub cache_csv_content {
     my $mech = shift;
