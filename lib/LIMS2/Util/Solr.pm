@@ -1,4 +1,10 @@
 package LIMS2::Util::Solr;
+## no critic(RequireUseStrict,RequireUseWarnings)
+{
+    $LIMS2::Util::Solr::VERSION = '0.081';
+}
+## use critic
+
 
 use strict;
 use warnings FATAL => 'all';

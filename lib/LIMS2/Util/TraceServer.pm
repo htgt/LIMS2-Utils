@@ -1,4 +1,10 @@
 package LIMS2::Util::TraceServer;
+## no critic(RequireUseStrict,RequireUseWarnings)
+{
+    $LIMS2::Util::TraceServer::VERSION = '0.081';
+}
+## use critic
+
 
 use strict;
 use warnings;
