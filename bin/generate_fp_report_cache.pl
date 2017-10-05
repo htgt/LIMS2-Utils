@@ -180,6 +180,7 @@ sub cache_sub_page_full {
     $content =~ s/sponsor_report\/[^\/]+\/([^\/]+)\/Genes[^>]*csv=1/cached_sponsor_csv\/$1/g;
     $content =~ s/without_cache/with_cache/g;
     $content =~ s/htgt_qc\ /Your profile\ /g;
+    $content =~ s/htgt_migrate\ /Your profile\ /g;
     $content =~ s/(?<=[^:])\/\/+/\//g;
 
     my $report_file_name = report_file( $species );
@@ -213,6 +214,7 @@ sub cache_sub_page_simple {
     $content =~ s/sponsor_report\/[^\/]+\/([^\/]+)\/Genes[^>]*csv=1/cached_sponsor_csv\/$1/g;
     $content =~ s/without_cache/with_cache/g;
     $content =~ s/(?<=[^:])\/\/+/\//g;
+    $content =~ s/htgt_migrate\ /Your profile\ /g;
     $content =~ s/htgt_qc\ /Your profile\ /g;
 
     my $report_file_name = report_file_simple( $species );
