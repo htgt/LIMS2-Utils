@@ -7,7 +7,6 @@ use Moose;
 
 use Try::Tiny;
 use File::Temp;
-use LWP::UserAgent;
 use Path::Class;
 
 use Log::Log4perl qw(:easy);
@@ -21,16 +20,16 @@ BEGIN {
     }
 }
 
-has fileserver_uri => (
+has file_api => (
     is => 'ro',
-    isa => 'Str',
+    isa => 'WebAppCommon::Util::RemoteFileAccess',
     lazy_build => 1,
 );
 
-sub _build_fileserver_uri {
-    my $uri = $ENV{FILE_API_URL}
-        or die "FILE_API_URL environment variable not set";
-    return $uri;
+sub _build_file_api {
+    return WebAppCommon::Util::FileAccess->construct(
+        {server => $ENV{LIMS2_FILE_ACCESS_SERVER}}
+    );
 }
 
 has lims2_seq_dir => (
@@ -44,23 +43,6 @@ sub _build_lims2_seq_dir {
         or die "LIMS2_SEQ_FILE_DIR environment variable not set or not a directory";
     return $dir;
 }
-
-has traceserver_uri => (
-    is => 'ro',
-    isa => 'Str',
-    lazy_build => 1,
-);
-
-sub _build_traceserver_uri {
-    my $uri = $ENV{TRACE_SERVER_URI} || 'http://si-trace-web.internal.sanger.ac.uk:8888/';
-    return $uri;
-}
-
-has user_agent => (
-    is => 'ro',
-    isa => 'LWP::UserAgent',
-    default => sub { LWP::UserAgent->new() },
-);
 
 has format => (
     is      => 'rw',
@@ -80,30 +62,18 @@ sub get_trace {
     $project_name =~ s/_\d$//g;
 
     my $data_dir = $self->lims2_seq_dir->subdir($project_name);
-    if($version){
+    if ($version) {
         $data_dir = $data_dir->subdir($version);
     }
     my $scf_path = $data_dir->file($name.".scf")->stringify;
 
-    my $lims2_scf_uri = $self->fileserver_uri.$scf_path;
-    $self->log->debug("getting trace from uri $lims2_scf_uri");
-    my $fileserver_response = $self->user_agent->get($lims2_scf_uri);
-    if($fileserver_response->is_success){
-        return $fileserver_response->content;
+    if ($self->file_api->check_file_existence($scf_path)) {
+        return $self->file_api->get_file_content($scf_path);
     }
-    else{
-        $self->log->debug("could not get scf from $lims2_scf_uri. trying traceserver");
+    else {
+        die "could not find $scf_path";
     }
 
-    my $uri = $self->traceserver_uri."get_trace/$name.scf";
-    $self->log->debug("getting trace from $uri");
-    my $response = $self->user_agent->get($uri);
-
-    if($response->is_success){
-        return $response->content;
-    }
-
-    die "Could not get trace for read $name from $uri - ".$response->status_line;
 }
 
 
@@ -146,7 +116,7 @@ LIMS2::Util::TraceServer
 
 =head1 DESCRIPTION
 
-Helper module for retrieving traces from Sanger's Internal Trace Server http server
+Helper module for retrieving traces
 
 =head1 AUTHOR
 
