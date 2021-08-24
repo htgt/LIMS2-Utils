@@ -44,6 +44,23 @@ sub _build_lims2_seq_dir {
     return $dir;
 }
 
+has traceserver_uri => (
+    is => 'ro',
+    isa => 'Str',
+    lazy_build => 1,
+);
+
+sub _build_traceserver_uri {
+    my $uri = $ENV{TRACE_SERVER_URI} || 'http://si-trace-web.internal.sanger.ac.uk:8888/';
+    return $uri;
+}
+
+has user_agent => (
+    is => 'ro',
+    isa => 'LWP::UserAgent',
+    default => sub { LWP::UserAgent->new() },
+);
+
 has format => (
     is      => 'rw',
     isa     => 'Str',
@@ -65,15 +82,24 @@ sub get_trace {
     if ($version) {
         $data_dir = $data_dir->subdir($version);
     }
-    my $scf_path = $data_dir->file($name.".scf")->stringify;
+    my $scf_path = $data_dir->file("$name.scf")->stringify;
 
     if ($self->file_api->check_file_existence($scf_path)) {
         return $self->file_api->get_file_content($scf_path);
     }
     else {
-        die "could not find $scf_path";
+        $self->log->debug("could not get scf from $lims2_scf_uri. trying traceserver");
     }
 
+    my $uri = $self->traceserver_uri . "get_trace/$name.scf";
+    $self->log->debug("getting trace from $uri");
+    my $response = $self->user_agent->get($uri);
+
+    if ($response->is_success) {
+        return $response->content;
+    }
+
+	die "Could not get trace for read $name from $uri - " . $response->status_line;
 }
 
 
@@ -116,7 +142,7 @@ LIMS2::Util::TraceServer
 
 =head1 DESCRIPTION
 
-Helper module for retrieving traces
+Helper module for retrieving traces from Sanger's Internal Trace Server http server
 
 =head1 AUTHOR
 
