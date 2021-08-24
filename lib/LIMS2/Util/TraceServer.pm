@@ -99,7 +99,7 @@ sub get_trace {
         return $response->content;
     }
 
-	die "Could not get trace for read $name from $uri - " . $response->status_line;
+    die "Could not get trace for read $name from $uri - " . $response->status_line;
 }
 
 
