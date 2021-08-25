@@ -88,7 +88,7 @@ sub get_trace {
         return $self->file_api->get_file_content($scf_path);
     }
     else {
-        $self->log->debug("could not get scf from $lims2_scf_uri. trying traceserver");
+        $self->log->debug("could not find $scf_path. trying traceserver");
     }
 
     my $uri = $self->traceserver_uri . "get_trace/$name.scf";
