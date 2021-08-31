@@ -7,7 +7,6 @@ use Moose;
 
 use Try::Tiny;
 use File::Temp;
-use LWP::UserAgent;
 use Path::Class;
 
 use Log::Log4perl qw(:easy);
@@ -21,16 +20,16 @@ BEGIN {
     }
 }
 
-has fileserver_uri => (
+has file_api => (
     is => 'ro',
-    isa => 'Str',
+    isa => 'WebAppCommon::Util::RemoteFileAccess',
     lazy_build => 1,
 );
 
-sub _build_fileserver_uri {
-    my $uri = $ENV{FILE_API_URL}
-        or die "FILE_API_URL environment variable not set";
-    return $uri;
+sub _build_file_api {
+    return WebAppCommon::Util::FileAccess->construct(
+        {server => $ENV{LIMS2_FILE_ACCESS_SERVER}}
+    );
 }
 
 has lims2_seq_dir => (
@@ -80,30 +79,27 @@ sub get_trace {
     $project_name =~ s/_\d$//g;
 
     my $data_dir = $self->lims2_seq_dir->subdir($project_name);
-    if($version){
+    if ($version) {
         $data_dir = $data_dir->subdir($version);
     }
-    my $scf_path = $data_dir->file($name.".scf")->stringify;
+    my $scf_path = $data_dir->file("$name.scf")->stringify;
 
-    my $lims2_scf_uri = $self->fileserver_uri.$scf_path;
-    $self->log->debug("getting trace from uri $lims2_scf_uri");
-    my $fileserver_response = $self->user_agent->get($lims2_scf_uri);
-    if($fileserver_response->is_success){
-        return $fileserver_response->content;
+    if ($self->file_api->check_file_existence($scf_path)) {
+        return $self->file_api->get_file_content($scf_path);
     }
-    else{
-        $self->log->debug("could not get scf from $lims2_scf_uri. trying traceserver");
+    else {
+        $self->log->debug("could not find $scf_path. trying traceserver");
     }
 
-    my $uri = $self->traceserver_uri."get_trace/$name.scf";
+    my $uri = $self->traceserver_uri . "get_trace/$name.scf";
     $self->log->debug("getting trace from $uri");
     my $response = $self->user_agent->get($uri);
 
-    if($response->is_success){
+    if ($response->is_success) {
         return $response->content;
     }
 
-    die "Could not get trace for read $name from $uri - ".$response->status_line;
+    die "Could not get trace for read $name from $uri - " . $response->status_line;
 }
 
 
