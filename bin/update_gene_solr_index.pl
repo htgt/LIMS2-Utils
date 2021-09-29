@@ -9,7 +9,7 @@ use List::Util qw(sum first);
 use Log::Log4perl ':easy';
 
 use Const::Fast;
-const my $HUMAN_URL => 'http://www.genenames.org/cgi-bin/download?col=gd_hgnc_id&col=gd_app_sym&col=gd_app_name&col=gd_pub_chrom_map&col=md_ensembl_id&status=Approved&status_opt=2&where=&order_by=gd_app_sym_sort&format=text&limit=&hgnc_dbtag=on&submit=submit';
+const my $HUMAN_URL => 'https://www.genenames.org/cgi-bin/download?col=gd_hgnc_id&col=gd_app_sym&col=gd_app_name&col=gd_pub_chrom_map&col=md_ensembl_id&status=Approved&status_opt=2&where=&order_by=gd_app_sym_sort&format=text&limit=&hgnc_dbtag=on&submit=submit';
 const my $MOUSE_URL => 'http://www.informatics.jax.org/downloads/reports/MRK_ENSEMBL.rpt';
 
 #my $depr_mouse_location = 'ftp://ftp.informatics.jax.org/pub/reports/MGI_AllGenes.rpt';
