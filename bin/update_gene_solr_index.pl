@@ -5,9 +5,6 @@ use warnings FATAL => 'all';
 use LWP::Simple;
 use HTML::Entities;
 
-use LIMS2::Model;
-use LIMS2::Model::Util::DesignTargets qw( design_target_report_for_genes );
-use LIMS2::Model::Constants qw( %DEFAULT_SPECIES_BUILD );
 use List::Util qw(sum first);
 use Log::Log4perl ':easy';
 
@@ -79,18 +76,7 @@ INFO "LIMS2 gene solr index update: Process completed at : $end_time";
 ## no critic(ProhibitComplexRegexes)
 sub build_list {
 
-    my $model = LIMS2::Model->new( user => 'lims2' );
-
-    my (@rows) = $model->schema->resultset('Project')->search({
-        targeting_type => 'single_targeted',
-    },{
-        columns        => [qw/ gene_id /],
-        distinct       => 1
-    });
-
     print $GENE_LIST "<add>\n";
-
-    my @gene_list = map {$_->gene_id} @rows;
 
     while (<$HUMAN_FILE>) {
         chomp;
