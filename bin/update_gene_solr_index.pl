@@ -61,8 +61,8 @@ system("rm $mouse_file");
 
 
 INFO "Updating solr index...\n";
-system("sh post.sh $update_file");
-system("rm $update_file");
+system("sh post.sh $update_file") == 0 or die "Posting update failed: $?";
+system("rm $update_file") == 0 or die "File removal failed: $?";
 INFO "Done.\n";
 
 

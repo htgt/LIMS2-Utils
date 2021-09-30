@@ -14,13 +14,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 set -u
+set -e
 
 FILES=$*
 URL=$SOLR_UPDATE_URL
 
 for f in $FILES; do
   echo Posting file $f to $URL
-  curl $URL --data-binary @$f -H 'Content-type:application/xml' 
+  curl $URL --data-binary @$f -H 'Content-type:application/xml' --fail
   echo
 done
 
