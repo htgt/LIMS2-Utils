@@ -5,14 +5,11 @@ use warnings FATAL => 'all';
 use LWP::Simple;
 use HTML::Entities;
 
-use LIMS2::Model;
-use LIMS2::Model::Util::DesignTargets qw( design_target_report_for_genes );
-use LIMS2::Model::Constants qw( %DEFAULT_SPECIES_BUILD );
 use List::Util qw(sum first);
 use Log::Log4perl ':easy';
 
 use Const::Fast;
-const my $HUMAN_URL => 'http://www.genenames.org/cgi-bin/download?col=gd_hgnc_id&col=gd_app_sym&col=gd_app_name&col=gd_pub_chrom_map&col=md_ensembl_id&status=Approved&status_opt=2&where=&order_by=gd_app_sym_sort&format=text&limit=&hgnc_dbtag=on&submit=submit';
+const my $HUMAN_URL => 'https://www.genenames.org/cgi-bin/download?col=gd_hgnc_id&col=gd_app_sym&col=gd_app_name&col=gd_pub_chrom_map&col=md_ensembl_id&status=Approved&status_opt=2&where=&order_by=gd_app_sym_sort&format=text&limit=&hgnc_dbtag=on&submit=submit';
 const my $MOUSE_URL => 'http://www.informatics.jax.org/downloads/reports/MRK_ENSEMBL.rpt';
 
 #my $depr_mouse_location = 'ftp://ftp.informatics.jax.org/pub/reports/MGI_AllGenes.rpt';
@@ -64,8 +61,8 @@ system("rm $mouse_file");
 
 
 INFO "Updating solr index...\n";
-system("sh post.sh $update_file");
-system("rm $update_file");
+system("sh post.sh $update_file") == 0 or die "Posting update failed: $?";
+system("rm $update_file") == 0 or die "File removal failed: $?";
 INFO "Done.\n";
 
 
@@ -79,18 +76,7 @@ INFO "LIMS2 gene solr index update: Process completed at : $end_time";
 ## no critic(ProhibitComplexRegexes)
 sub build_list {
 
-    my $model = LIMS2::Model->new( user => 'lims2' );
-
-    my (@rows) = $model->schema->resultset('Project')->search({
-        targeting_type => 'single_targeted',
-    },{
-        columns        => [qw/ gene_id /],
-        distinct       => 1
-    });
-
     print $GENE_LIST "<add>\n";
-
-    my @gene_list = map {$_->gene_id} @rows;
 
     while (<$HUMAN_FILE>) {
         chomp;
