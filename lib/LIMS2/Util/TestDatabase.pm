@@ -168,6 +168,9 @@ user_preferences             => 'UserPreference',
 user_role                    => 'UserRole',
 users                        => 'User',
 summaries                    => 'Summary',
+amplicon_types               => 'AmpliconType',
+amplicons                    => 'Amplicon',
+design_amplicons             => 'DesignAmplicon',
 );
 
 =head2 setup_clean_database
