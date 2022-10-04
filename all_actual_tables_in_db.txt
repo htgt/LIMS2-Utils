@@ -153,13 +153,6 @@ sequencing_project_templates
 species
 species_default_assembly
 sponsors
-sql_features
-sql_implementation_info
-sql_languages
-sql_packages
-sql_parts
-sql_sizing
-sql_sizing_profiles
 strategies
 summaries
 targeting_profiles

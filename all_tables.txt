@@ -153,13 +153,6 @@ SequencingProjectTemplate
 Species
 SpeciesDefaultAssembly
 Sponsor
-
-
-
-
-
-
-
 Strategy
 Summary
 TargetingProfile
