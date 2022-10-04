@@ -51,7 +51,6 @@ design_targets                              =>  'DesignTarget'
 design_types                                =>  'DesignType'
 dna_templates                               =>  'DnaTemplate'
 experiments                                 =>  'Experiment'
-fixture_md5                                 
 fp_picking_list                             =>  'FpPickingList'
 fp_picking_list_well_barcode                =>  'FpPickingListWellBarcode'
 gene_design                                 =>  'GeneDesign'
